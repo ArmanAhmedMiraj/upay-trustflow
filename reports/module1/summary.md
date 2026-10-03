@@ -105,4 +105,4 @@ Using an old, quiet mule account removes most of the recipient-side evidence. Th
 
 ## Speed
 
-Average scoring time: 4.1 ms per transfer (single CPU core).
+Average scoring time: 2.3 ms per transfer (single CPU core).

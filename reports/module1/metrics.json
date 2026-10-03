@@ -34,25 +34,25 @@
   },
   "calibration": {
     "brier_raw": 0.006157802879575735,
-    "brier_calibrated": 0.006010290230970792,
-    "ece_raw": 0.003611365859596921,
-    "ece_calibrated": 0.0019080560604144078,
+    "brier_calibrated": 0.0060102902309707934,
+    "ece_raw": 0.0036113658595969197,
+    "ece_calibrated": 0.0019080560604144055,
     "reliability_calibrated": [
       {
         "band": "0%-2%",
-        "predicted_mean": 0.0012306846801050405,
+        "predicted_mean": 0.0012306846801050414,
         "actual_fraud_rate": 0.0024000165518382886,
         "n": 48333
       },
       {
         "band": "2%-5%",
-        "predicted_mean": 0.031753262116786786,
+        "predicted_mean": 0.03175326211678681,
         "actual_fraud_rate": 0.04186046511627907,
         "n": 860
       },
       {
         "band": "5%-10%",
-        "predicted_mean": 0.06298613027862439,
+        "predicted_mean": 0.06298613027862436,
         "actual_fraud_rate": 0.05342237061769616,
         "n": 599
       },
@@ -70,13 +70,13 @@
       },
       {
         "band": "40%-60%",
-        "predicted_mean": 0.45212395738630856,
+        "predicted_mean": 0.45212395738630873,
         "actual_fraud_rate": 0.3584905660377358,
         "n": 53
       },
       {
         "band": "60%-80%",
-        "predicted_mean": 0.6544740237232354,
+        "predicted_mean": 0.6544740237232357,
         "actual_fraud_rate": 0.6846153846153846,
         "n": 130
       },
@@ -210,7 +210,7 @@
     "1-2 reports": 0.5323686412786657,
     "3+ reports": 0.9555868186621371
   },
-  "latency_ms_per_transfer": 4.1,
+  "latency_ms_per_transfer": 2.3,
   "leave_one_scam_type_out": {
     "advance_payment": {
       "recall_unseen_script_at_2pct_friction": 0.8341708542713567,
