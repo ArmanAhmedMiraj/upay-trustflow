@@ -58,6 +58,19 @@ def main() -> None:
         if sms is not None:
             db.rollback()                      # the fake message was only for this check
 
+    # which amount lands in the safety-check tier (the questions demo) at THIS moment? It changes with the time of day.
+    nusrat = who("nusrat")
+    found = None
+    for amount in range(2000, min(nusrat.balance, 20000) + 1, 500):
+        features = risk_features.build_live_features(db, nusrat, who("fashion_hub"), amount, {"hesitation_secs": 12})
+        out = scorer.score_transfer(features, art)
+        if out["action"] == "safety_check":
+            found = (amount, out["risk_pct"])
+            break
+    print("\nSafety-check questions demo (right now): " + (
+        f"Nusrat sends {found[0]:,} to Fashion Hub BD -> {found[1]}% -> the two questions appear" if found
+        else "no amount lands in the middle tier at this hour; use the 'I am on a phone call' tick-box and try 6,000-10,000"))
+
     print("\nNetwork learning: Rahim pays 5,000 to fraud wallet 2, as customers report it")
     print(f"  {'':22s} {'calm':>14s} {'on a call':>16s}")
     for n in range(len(REPORTERS) + 1):

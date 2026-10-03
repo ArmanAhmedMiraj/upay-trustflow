@@ -36,6 +36,7 @@ from models import Report, SmsMessage, Transaction, User, utcnow  # noqa: E402
 DHAKA = timedelta(hours=6)
 DEFAULT_PIN, ANALYST_PIN = "12345", "99999"
 MAX_BALANCE = 500_000
+DEMO_MIN_BALANCE = 30_000
 
 FIRST = ["Rahim", "Karim", "Salma", "Nusrat", "Sumon", "Tania", "Faruk", "Mitu", "Jahid", "Rina", "Imran", "Shirin", "Hasan",
          "Lipi", "Kamal", "Runa", "Sohel", "Moni", "Babul", "Papia", "Rubel", "Nazma", "Arif", "Shapla", "Tuhin", "Dola"]
@@ -190,6 +191,14 @@ def seed(db, n_users: int = 1500, days: int = 60, seed_value: int = 42, now: dat
         balance[s] = balance.get(s, 0) - amount
         balance[r] = balance.get(r, 0) + amount
         ledger.append(dict(kind=kind, sender_id=s, receiver_id=r, amount=amount, status="completed", created_at=when))
+    # the demo characters must be able to afford the demo: at least 30,000 taka each (a top-up before midnight today)
+    for w in [rahim, mum, *others]:
+        have = balance.get(uid(w), 0)
+        if have < DEMO_MIN_BALANCE:
+            top = int(math.ceil((DEMO_MIN_BALANCE - have) / 500.0) * 500)
+            ledger.append(dict(kind="add_money", sender_id=None, receiver_id=uid(w), amount=top, status="completed",
+                               created_at=end - timedelta(hours=3)))
+            balance[uid(w)] = have + top
     for who, bal in list(balance.items()):                              # no wallet may hold more than the limit
         if bal > MAX_BALANCE and who not in agent_ids:
             ledger.append(dict(kind="cash_out", sender_id=who, receiver_id=agent_ids[who % 3], amount=bal - 100_000,

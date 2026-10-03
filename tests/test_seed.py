@@ -101,3 +101,9 @@ def test_seeding_is_repeatable():
         info = sw.seed(db, n_users=120, days=20, seed_value=7, now=NOW, log=lambda *_: None)
         return (info["users"], info["transactions"], db.scalar(select(func.sum(Transaction.amount))))
     assert fingerprint() == fingerprint()
+
+
+def test_demo_characters_can_afford_the_demo(world):
+    db, _ = world
+    for key in ("rahim", "mum", "nusrat", "sumon"):
+        assert person(db, key).balance >= sw.DEMO_MIN_BALANCE, key
