@@ -10,6 +10,8 @@ Principles
 """
 from __future__ import annotations
 
+import json
+import os
 import re
 from datetime import timedelta
 
@@ -32,6 +34,11 @@ MAX_SEND = 50_000
 MAX_ADD_MONEY = 50_000
 MAX_BALANCE = 500_000
 ALLOWED_NOW = ("allow", "allow_with_note")   # risk actions that let the money move straight away
+NEEDS_ACK = ("safety_check", "warn_and_confirm", "hold_30min")   # the customer must confirm after reading the warning
+
+
+def hold_minutes() -> int:
+    return int(os.getenv("HOLD_MINUTES", "30"))
 
 
 class WalletError(Exception):
@@ -191,6 +198,110 @@ def _move(db: Session, kind: str, sender: User, recipient: User, amount: int, ke
     return txn
 
 
+def _hold(db: Session, kind: str, sender: User, recipient: User, amount: int, key: str | None,
+          risk_pct: int | None, risk_tier: str | None) -> Transaction:
+    """Take the money out of the sender's balance and keep it safe (escrow) until the hold ends."""
+    db.execute(select(User).where(User.id == sender.id).with_for_update())
+    db.refresh(sender)
+    if sender.balance < amount:
+        raise WalletError("insufficient_balance", "You do not have enough balance", 400)
+    sender.balance -= amount
+    txn = Transaction(kind=kind, sender_id=sender.id, receiver_id=recipient.id, amount=amount, status="held",
+                      release_at=utcnow() + timedelta(minutes=hold_minutes()), risk_pct=risk_pct, risk_tier=risk_tier,
+                      idempotency_key=key)
+    db.add(txn)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        again = _existing(db, sender, key)
+        if again:
+            return again
+        raise
+    return txn
+
+
+def _credit_message(db: Session, txn: Transaction, sender: User, recipient: User) -> None:
+    db.add(SmsMessage(user_id=recipient.id, sender_label="upay", kind="credit_claim", official=True,
+                      claimed_amount=txn.amount, claimed_number=sender.phone,
+                      text=f"You have received Tk {txn.amount:,} from {sender.phone}. TrxID {txn.id:08d}."))
+
+
+def _finish_hold(db: Session, txn: Transaction, outcome: str, reviewer: User | None = None,
+                 note: str | None = None, now=None) -> Transaction:
+    """End a hold. outcome: "release" (money goes to the recipient), "cancel" (back to the sender) or "reject"."""
+    ids = sorted([txn.sender_id, txn.receiver_id])
+    db.execute(select(User).where(User.id.in_(ids)).order_by(User.id).with_for_update())
+    sender, recipient = db.get(User, txn.sender_id), db.get(User, txn.receiver_id)
+    db.refresh(sender)
+    db.refresh(recipient)
+    status = {"release": "completed", "cancel": "cancelled", "reject": "rejected"}[outcome]
+    if outcome == "release" and recipient.balance + txn.amount > MAX_BALANCE:
+        outcome, status, note = "reject", "rejected", "Recipient wallet limit reached"      # the money goes back instead
+    if outcome == "release":
+        recipient.balance += txn.amount
+        _credit_message(db, txn, sender, recipient)
+    else:
+        sender.balance += txn.amount
+    txn.status = status
+    txn.decided_at = now or utcnow()
+    txn.reviewed_by = reviewer.id if reviewer else None
+    txn.review_note = (note or "")[:200] or None
+    db.commit()
+    return txn
+
+
+def settle_due_holds(db: Session, now=None) -> int:
+    """Release every hold whose time is up. Safe to call as often as you like (it does nothing twice)."""
+    now = now or utcnow()
+    due = db.scalars(select(Transaction).where(Transaction.status == "held", Transaction.release_at <= now)).all()
+    for txn in due:
+        _finish_hold(db, txn, "release", now=now)
+    return len(due)
+
+
+def cancel_hold(db: Session, user: User, txn_id: int) -> Transaction:
+    """The sender changes their mind (or realises it is a scam) during the hold: the money comes straight back."""
+    txn = db.get(Transaction, txn_id)
+    if txn is None or txn.sender_id != user.id:
+        raise WalletError("transaction_not_found", "Transaction not found", 404)
+    if txn.status != "held":
+        raise WalletError("not_cancellable", "Only a held transfer can be cancelled", 409)
+    return _finish_hold(db, txn, "cancel")
+
+
+def require_analyst(user: User) -> None:
+    if user.role != "analyst":
+        raise WalletError("forbidden", "This area is for fraud analysts only", 403)
+
+
+def analyst_cases(db: Session, status: str = "held", limit: int = 50) -> list[dict]:
+    q = select(Transaction).where(Transaction.risk_pct.is_not(None), Transaction.kind == "send_money")
+    if status != "all":
+        q = q.where(Transaction.status == status)
+    rows = db.scalars(q.order_by(Transaction.risk_pct.desc(), Transaction.id.desc()).limit(max(1, min(limit, 200)))).all()
+    out = []
+    for t in rows:
+        s, r = db.get(User, t.sender_id), db.get(User, t.receiver_id)
+        ev = db.scalar(select(RiskEvent).where(RiskEvent.transaction_id == t.id))
+        out.append({"id": t.id, "status": t.status, "amount": t.amount, "risk_pct": t.risk_pct, "risk_tier": t.risk_tier,
+                    "scam_type": ev.scam_type if ev else None, "reasons": json.loads(ev.reasons_json) if ev else [],
+                    "sender": {"name": s.name, "phone": s.phone}, "recipient": {"name": r.name, "phone": r.phone},
+                    "created_at": t.created_at.isoformat(), "release_at": t.release_at.isoformat() if t.release_at else None,
+                    "review_note": t.review_note})
+    return out
+
+
+def analyst_decide(db: Session, analyst: User, txn_id: int, approve: bool, note: str | None = None) -> Transaction:
+    require_analyst(analyst)
+    txn = db.get(Transaction, txn_id)
+    if txn is None:
+        raise WalletError("transaction_not_found", "Transaction not found", 404)
+    if txn.status != "held":
+        raise WalletError("already_decided", "This case is no longer waiting for a decision", 409)
+    return _finish_hold(db, txn, "release" if approve else "reject", reviewer=analyst, note=note)
+
+
 def _customer_recipient(db: Session, sender: User, recipient_phone: str) -> User:
     recipient = db.scalar(select(User).where(User.phone == recipient_phone))
     if recipient is None or recipient.role != "customer":
@@ -200,19 +311,21 @@ def _customer_recipient(db: Session, sender: User, recipient_phone: str) -> User
     return recipient
 
 
-def preview_send(db: Session, sender: User, recipient_phone: str, amount: int, behavior: dict | None = None):
-    """What Shield thinks of a transfer BEFORE the customer enters their PIN. No money moves, no PIN needed."""
+def preview_send(db: Session, sender: User, recipient_phone: str, amount: int, behavior: dict | None = None,
+                 safety_answers: list[dict] | None = None):
+    """What Shield thinks of a transfer BEFORE the customer enters their PIN. No money moves, no PIN needed.
+    With `safety_answers` it shows how the customer's answers changed the score."""
     _check_phone(recipient_phone)
     _check_amount(amount, MAX_SEND)
     recipient = _customer_recipient(db, sender, recipient_phone)
     if sender.balance < amount:
         raise WalletError("insufficient_balance", "You do not have enough balance", 400)
-    return risk_hook.check_transfer(db, sender, recipient, amount, behavior, source="preview"), recipient
+    return risk_hook.check_transfer(db, sender, recipient, amount, behavior, source="preview", answers=safety_answers), recipient
 
 
 def send_money(db: Session, sender: User, recipient_phone: str, amount: int, pin: str,
                idempotency_key: str | None = None, behavior: dict | None = None,
-               acknowledged_risk: bool = False) -> Transaction:
+               acknowledged_risk: bool = False, safety_answers: list[dict] | None = None) -> Transaction:
     _check_phone(recipient_phone)
     _check_amount(amount, MAX_SEND)
     again = _existing(db, sender, idempotency_key)
@@ -221,11 +334,14 @@ def send_money(db: Session, sender: User, recipient_phone: str, amount: int, pin
     verify_user_pin(db, sender, pin)
     recipient = _customer_recipient(db, sender, recipient_phone)
     # The server decides again here. It never trusts that the app already showed a preview.
-    decision = risk_hook.check_transfer(db, sender, recipient, amount, behavior, source="send")
-    proceed = decision.action in ALLOWED_NOW or (decision.action == "safety_check" and acknowledged_risk)
+    decision = risk_hook.check_transfer(db, sender, recipient, amount, behavior, source="send", answers=safety_answers)
+    proceed = decision.action in ALLOWED_NOW or (decision.action in NEEDS_ACK and acknowledged_risk)
     if not proceed:
         raise RiskInterruption(decision)               # nothing has moved yet
-    txn = _move(db, "send_money", sender, recipient, amount, idempotency_key, decision.risk_pct, decision.tier)
+    if decision.action == "hold_30min":                # the customer has seen the warning and confirmed: hold, do not send
+        txn = _hold(db, "send_money", sender, recipient, amount, idempotency_key, decision.risk_pct, decision.tier)
+    else:
+        txn = _move(db, "send_money", sender, recipient, amount, idempotency_key, decision.risk_pct, decision.tier)
     if decision.event_id:
         event = db.get(RiskEvent, decision.event_id)
         if event and event.transaction_id is None:
@@ -304,6 +420,16 @@ def history(db: Session, user: User, limit: int = 20) -> list[dict]:
         other = db.get(User, other_id) if other_id else None
         out.append({"id": t.id, "kind": t.kind, "direction": "out" if outgoing else "in", "amount": t.amount,
                     "status": t.status, "created_at": t.created_at.isoformat(),
+                    "release_at": t.release_at.isoformat() if t.release_at and t.status == "held" else None,
                     "counterparty_name": other.name if other else None,
                     "counterparty_phone": other.phone if other else None})
     return out
+
+
+def release_holds_now(db: Session, user: User) -> int:
+    """DEMO ONLY: make this customer's holds end right now, so the 30-minute wait can be shown in seconds."""
+    mine = db.scalars(select(Transaction).where(Transaction.sender_id == user.id, Transaction.status == "held")).all()
+    for t in mine:
+        t.release_at = utcnow() - timedelta(seconds=1)
+    db.commit()
+    return settle_due_holds(db)

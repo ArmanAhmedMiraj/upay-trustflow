@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from models import Report, SmsMessage, Transaction, User, utcnow
 
 DHAKA = timedelta(hours=6)
+DONE = Transaction.status == "completed"      # held, cancelled and rejected transfers never happened, so they are not history
 LINK_KINDS = ("send_money", "cash_out")          # transfers that create a sender -> recipient relationship
 LEDGER_WINDOW = timedelta(minutes=360)           # a claimed credit must appear in the ledger within 6 hours
 DEFAULT_BEHAVIOR = {"hesitation_secs": 7.0, "amount_edits": 0, "on_call": False}   # typical customer, if the app sends none
@@ -43,7 +44,7 @@ def build_live_features(db: Session, sender: User, recipient: User, amount: int,
 
     # ------------------------------------------------ Group A: the sender's own habits
     prior = db.execute(select(Transaction.amount, Transaction.created_at)
-                       .where(Transaction.sender_id == sender.id, Transaction.kind == "send_money",
+                       .where(Transaction.sender_id == sender.id, Transaction.kind == "send_money", DONE,
                               Transaction.created_at < now)).all()
     n = len(prior)
     logs = [math.log(a) for a, _ in prior]
@@ -60,16 +61,16 @@ def build_live_features(db: Session, sender: User, recipient: User, amount: int,
 
     seen_before = db.scalar(select(func.count()).select_from(Transaction).where(
         Transaction.sender_id == sender.id, Transaction.receiver_id == recipient.id,
-        Transaction.kind.in_(LINK_KINDS), Transaction.created_at < now))
+        Transaction.kind.in_(LINK_KINDS), DONE, Transaction.created_at < now))
 
     last_in = db.scalar(select(func.max(Transaction.created_at)).where(
-        Transaction.receiver_id == sender.id, Transaction.kind.in_(("send_money", "add_money")),
+        Transaction.receiver_id == sender.id, Transaction.kind.in_(("send_money", "add_money")), DONE,
         Transaction.created_at < now))
     mins_since_in = 10080.0 if last_in is None else min((now - last_in).total_seconds() / 60.0, 10080.0)
 
     # ------------------------------------------------ Group B: the recipient wallet
     day_ago = now - timedelta(days=1)
-    to_recipient = (Transaction.receiver_id == recipient.id, Transaction.kind.in_(LINK_KINDS), Transaction.created_at < now)
+    to_recipient = (Transaction.receiver_id == recipient.id, Transaction.kind.in_(LINK_KINDS), DONE, Transaction.created_at < now)
     first_seen = (select(Transaction.sender_id, func.min(Transaction.created_at).label("first"))
                   .where(*to_recipient).group_by(Transaction.sender_id).subquery())
     first_time_senders = db.scalar(select(func.count()).select_from(first_seen).where(first_seen.c.first >= day_ago))
@@ -77,7 +78,7 @@ def build_live_features(db: Session, sender: User, recipient: User, amount: int,
     inflow_amount = db.scalar(select(func.coalesce(func.sum(Transaction.amount), 0)).where(*to_recipient, Transaction.created_at >= day_ago))
     prior_txns = min(db.scalar(select(func.count()).select_from(Transaction).where(*to_recipient)), 5000)
     outflow_amount = db.scalar(select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-        Transaction.sender_id == recipient.id, Transaction.kind == "cash_out",
+        Transaction.sender_id == recipient.id, Transaction.kind == "cash_out", DONE,
         Transaction.created_at >= day_ago, Transaction.created_at < now))
     outflow_ratio = min(outflow_amount / max(inflow_amount, 1), 3.0) if inflow_amount > 0 else 0.0
     reports = db.scalar(select(func.count()).select_from(Report).where(Report.reported_id == recipient.id, Report.created_at < now))
@@ -90,7 +91,7 @@ def build_live_features(db: Session, sender: User, recipient: User, amount: int,
     if claims:
         confirms = db.scalar(select(func.count()).select_from(Transaction).join(User, User.id == Transaction.sender_id).where(
             Transaction.receiver_id == sender.id, User.phone == claim.claimed_number,
-            Transaction.amount == claim.claimed_amount, Transaction.kind.in_(("send_money", "add_money")),
+            Transaction.amount == claim.claimed_amount, Transaction.kind.in_(("send_money", "add_money")), DONE,
             Transaction.created_at >= now - LEDGER_WINDOW, Transaction.created_at < now)) > 0
     mismatch = claims and not confirms
 

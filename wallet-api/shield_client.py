@@ -26,10 +26,32 @@ def _post(path: str, payload: dict) -> dict | None:
     return response.json()
 
 
+SCORE_KEYS = {"action", "risk_pct", "tier"}
+REFINE_KEYS = {"action_after", "risk_after_pct", "tier_after", "risk_before_pct"}
+
+
+def _checked(result: dict | None, keys: set) -> dict | None:
+    """A reply that is missing fields is treated as 'Shield unavailable', never trusted halfway."""
+    if result is None:
+        return None
+    if not isinstance(result, dict) or not keys <= set(result):
+        raise ValueError(f"unexpected reply from Shield: {str(result)[:120]}")
+    return result
+
+
 def assess(features: dict) -> dict | None:
     """Ask Shield to score a transfer. Returns None when Shield is unavailable for any reason."""
     try:
-        return _post("/risk/score", features)
+        return _checked(_post("/risk/score", features), SCORE_KEYS)
     except Exception as exc:   # network error, timeout, bad reply: never let it break a payment
         log.warning("Shield unavailable, allowing the transfer: %s", exc)
+        return None
+
+
+def refine(features: dict, answers: list[dict]) -> dict | None:
+    """Ask Shield to re-score a transfer using the customer's safety-check answers (None if unavailable)."""
+    try:
+        return _checked(_post("/risk/refine", {"features": features, "answers": answers}), REFINE_KEYS)
+    except Exception as exc:
+        log.warning("Shield refine unavailable: %s", exc)
         return None

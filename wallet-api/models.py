@@ -46,6 +46,7 @@ class Transaction(Base):
     sender_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     receiver_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     amount: Mapped[int] = mapped_column(Integer)  # whole BDT
+    # completed, held (waiting), cancelled (by the sender), rejected (by an analyst)
     status: Mapped[str] = mapped_column(String(20), default="completed")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     # filled in by Shield when it scores a transfer (empty until then)
@@ -53,6 +54,11 @@ class Transaction(Base):
     risk_tier: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # lets a client safely retry a request (double tap, bad network) without moving money twice
     idempotency_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # holds: while status = "held" the sender has been debited and the money waits (escrow) until release_at
+    release_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class AuthSession(Base):

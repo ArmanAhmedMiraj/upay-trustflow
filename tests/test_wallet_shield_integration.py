@@ -38,7 +38,12 @@ def world(monkeypatch):
 
     wallet_api.app.dependency_overrides[database.get_db] = override
     with TestClient(shield_api.app) as shield, TestClient(wallet_api.app) as wallet:
-        monkeypatch.setattr(shield_client, "_post", lambda path, payload: shield.post(path, json=payload).json())
+        def to_shield(path, payload):
+            response = shield.post(path, json=payload)
+            response.raise_for_status()          # like the real call: an error status is an error
+            return response.json()
+
+        monkeypatch.setattr(shield_client, "_post", to_shield)
         wallet.Session, wallet.shield = Session, shield
         yield wallet
     wallet_api.app.dependency_overrides.clear()

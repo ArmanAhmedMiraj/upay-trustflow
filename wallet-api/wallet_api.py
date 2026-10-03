@@ -59,6 +59,11 @@ class Behavior(BaseModel):
     on_call: bool = False
 
 
+class AnswerIn(BaseModel):
+    question_id: str
+    answer: str = Field(description="yes, no or not_sure")
+
+
 class SendIn(BaseModel):
     recipient_phone: str
     amount: int
@@ -66,12 +71,18 @@ class SendIn(BaseModel):
     idempotency_key: str | None = Field(default=None, max_length=64)
     behavior: Behavior | None = None
     acknowledged_risk: bool = Field(default=False, description="True when the customer has read the warning and chooses to continue")
+    safety_answers: list[AnswerIn] | None = Field(default=None, description="The customer's answers to Shield's safety-check questions")
 
 
 class PreviewIn(BaseModel):
     recipient_phone: str
     amount: int
     behavior: Behavior | None = None
+    safety_answers: list[AnswerIn] | None = None
+
+
+class DecisionIn(BaseModel):
+    note: str | None = Field(default=None, max_length=200)
 
 
 class ReportIn(BaseModel):
@@ -93,12 +104,21 @@ class CashOutIn(BaseModel):
 
 def current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> User:
     token = authorization[7:] if authorization and authorization.lower().startswith("bearer ") else None
-    return svc.authenticate(db, token)
+    user = svc.authenticate(db, token)
+    if svc.settle_due_holds(db):          # any hold whose time is up is released as soon as anyone makes a request
+        db.refresh(user)
+    return user
+
+
+def analyst_user(user: User = Depends(current_user)) -> User:
+    svc.require_analyst(user)
+    return user
 
 
 def txn_out(t) -> dict:
     return {"id": t.id, "kind": t.kind, "amount": t.amount, "status": t.status,
-            "created_at": t.created_at.isoformat(), "risk_pct": t.risk_pct, "risk_tier": t.risk_tier}
+            "created_at": t.created_at.isoformat(), "risk_pct": t.risk_pct, "risk_tier": t.risk_tier,
+            "release_at": t.release_at.isoformat() if t.release_at and t.status == "held" else None}
 
 
 # ------------------------------------------------------------------ routes
@@ -139,17 +159,42 @@ def add_money(body: AddMoneyIn, user: User = Depends(current_user), db: Session 
 @app.post("/wallet/send")
 def send(body: SendIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     behavior = body.behavior.model_dump() if body.behavior else None
+    answers = [a.model_dump() for a in body.safety_answers] if body.safety_answers else None
     txn = svc.send_money(db, user, body.recipient_phone, body.amount, body.pin, body.idempotency_key, behavior,
-                         body.acknowledged_risk)
+                         body.acknowledged_risk, answers)
     db.refresh(user)
     return {"transaction": txn_out(txn), "balance": user.balance}
+
+
+@app.post("/wallet/transactions/{txn_id}/cancel")
+def cancel(txn_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Cancel a held transfer. The money returns to your balance immediately."""
+    txn = svc.cancel_hold(db, user, txn_id)
+    db.refresh(user)
+    return {"transaction": txn_out(txn), "balance": user.balance}
+
+
+@app.get("/analyst/cases")
+def analyst_cases(status: str = "held", limit: int = 50, user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    return {"cases": svc.analyst_cases(db, status, limit)}
+
+
+@app.post("/analyst/cases/{txn_id}/approve")
+def analyst_approve(txn_id: int, body: DecisionIn | None = None, user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    return {"transaction": txn_out(svc.analyst_decide(db, user, txn_id, True, body.note if body else None))}
+
+
+@app.post("/analyst/cases/{txn_id}/reject")
+def analyst_reject(txn_id: int, body: DecisionIn | None = None, user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    return {"transaction": txn_out(svc.analyst_decide(db, user, txn_id, False, body.note if body else None))}
 
 
 @app.post("/wallet/send/preview")
 def send_preview(body: PreviewIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Shield's opinion on a transfer before the PIN step. Moves no money."""
     behavior = body.behavior.model_dump() if body.behavior else None
-    decision, recipient = svc.preview_send(db, user, body.recipient_phone, body.amount, behavior)
+    answers = [a.model_dump() for a in body.safety_answers] if body.safety_answers else None
+    decision, recipient = svc.preview_send(db, user, body.recipient_phone, body.amount, behavior, answers)
     return {"recipient": {"name": recipient.name, "phone": recipient.phone}, "risk": decision.as_dict()}
 
 
@@ -174,6 +219,14 @@ def demo_fake_sms(body: FakeSmsIn, user: User = Depends(current_user), db: Sessi
         raise svc.WalletError("demo_disabled", "Demo tools are switched off", 404)
     svc.drop_fake_sms(db, user, body.amount, body.from_number)
     return {"ok": True}
+
+
+@app.post("/demo/release-holds-now")
+def demo_release_holds(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """DEMO ONLY: end your own holds right now, so the 30-minute wait can be shown in seconds."""
+    if not DEMO_MODE:
+        raise svc.WalletError("demo_disabled", "Demo tools are switched off", 404)
+    return {"released": svc.release_holds_now(db, user)}
 
 
 @app.post("/wallet/cash-out")
