@@ -3,3 +3,8 @@ uvicorn
 sqlalchemy
 pytest
 httpx
+numpy
+pandas
+scikit-learn
+lightgbm
+matplotlib
