@@ -33,7 +33,9 @@ def simulate(n_users: int = 6000, days: int = 120, seed: int = 42, fraud_rate: f
     rng = np.random.default_rng(seed)
 
     # ------------------------------------------------------------------ wallets
-    n_sellers, n_merchants, n_collectors, n_fraud = 1500, 300, 120, 150
+    # the wallet population scales with the number of customers (these are the original numbers at 6,000 customers)
+    n_sellers, n_merchants = max(100, n_users // 4), max(30, n_users // 20)
+    n_collectors, n_fraud = max(10, n_users // 50), max(15, n_users // 40)
     seller0 = n_users
     merch0 = seller0 + n_sellers
     coll0 = merch0 + n_merchants
