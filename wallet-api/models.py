@@ -8,7 +8,7 @@ Money rules built into the design
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -65,3 +65,53 @@ class AuthSession(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class Report(Base):
+    """A customer reporting a number as suspicious. One report per reporter per number (stops report-bombing)."""
+
+    __tablename__ = "reports"
+    __table_args__ = (UniqueConstraint("reporter_id", "reported_id", name="uq_one_report_per_pair"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reporter_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    reported_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class SmsMessage(Base):
+    """A message in a customer's inbox. Real upay credit messages are created by the wallet itself
+    (so they are always true); demo mode can also drop in a FAKE 'money received' message."""
+
+    __tablename__ = "sms_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    sender_label: Mapped[str] = mapped_column(String(20))          # "upay" for official, otherwise a phone number
+    text: Mapped[str] = mapped_column(String(300))
+    kind: Mapped[str] = mapped_column(String(20), default="credit_claim")
+    claimed_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    claimed_number: Mapped[str | None] = mapped_column(String(11), nullable=True)
+    official: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class RiskEvent(Base):
+    """Every assessment Shield made, kept for the analyst console and the impact numbers."""
+
+    __tablename__ = "risk_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    amount: Mapped[int] = mapped_column(Integer)
+    risk_pct: Mapped[int] = mapped_column(Integer)
+    tier: Mapped[str] = mapped_column(String(20))
+    action: Mapped[str] = mapped_column(String(20))
+    scam_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    reasons_json: Mapped[str] = mapped_column(Text, default="[]")
+    source: Mapped[str] = mapped_column(String(10))                 # "preview" or "send"
+    shield_available: Mapped[bool] = mapped_column(Boolean, default=True)
+    transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

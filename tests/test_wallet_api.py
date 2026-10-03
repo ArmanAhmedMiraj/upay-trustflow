@@ -124,5 +124,6 @@ def test_a_risk_interruption_returns_409_with_the_decision_and_moves_no_money(cl
     client.post("/wallet/add-money", json={"amount": 5000}, headers=h)
     monkeypatch.setattr(risk_hook, "check_transfer", lambda *a, **k: risk_hook.RiskDecision("hold_30min", 96, "very_high"))
     r = client.post("/wallet/send", headers=h, json={"recipient_phone": "01711000002", "amount": 3000, "pin": "12345"})
-    assert r.status_code == 409 and r.json()["risk"] == {"action": "hold_30min", "risk_pct": 96, "tier": "very_high"}
+    risk = r.json()["risk"]
+    assert r.status_code == 409 and (risk["action"], risk["risk_pct"], risk["tier"]) == ("hold_30min", 96, "very_high")
     assert client.get("/me", headers=h).json()["user"]["balance"] == 5000

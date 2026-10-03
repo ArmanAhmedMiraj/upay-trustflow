@@ -32,8 +32,7 @@ app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ORIGINS", "*").
 async def wallet_error_handler(request: Request, exc: svc.WalletError):
     body = {"code": exc.code, "detail": exc.message}
     if isinstance(exc, svc.RiskInterruption):
-        d = exc.decision
-        body["risk"] = {"action": d.action, "risk_pct": d.risk_pct, "tier": d.tier}
+        body["risk"] = exc.decision.as_dict()
     return JSONResponse(status_code=exc.status, content=body)
 
 
@@ -66,6 +65,23 @@ class SendIn(BaseModel):
     pin: str
     idempotency_key: str | None = Field(default=None, max_length=64)
     behavior: Behavior | None = None
+    acknowledged_risk: bool = Field(default=False, description="True when the customer has read the warning and chooses to continue")
+
+
+class PreviewIn(BaseModel):
+    recipient_phone: str
+    amount: int
+    behavior: Behavior | None = None
+
+
+class ReportIn(BaseModel):
+    phone: str
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class FakeSmsIn(BaseModel):
+    amount: int
+    from_number: str
 
 
 class CashOutIn(BaseModel):
@@ -123,9 +139,41 @@ def add_money(body: AddMoneyIn, user: User = Depends(current_user), db: Session 
 @app.post("/wallet/send")
 def send(body: SendIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     behavior = body.behavior.model_dump() if body.behavior else None
-    txn = svc.send_money(db, user, body.recipient_phone, body.amount, body.pin, body.idempotency_key, behavior)
+    txn = svc.send_money(db, user, body.recipient_phone, body.amount, body.pin, body.idempotency_key, behavior,
+                         body.acknowledged_risk)
     db.refresh(user)
     return {"transaction": txn_out(txn), "balance": user.balance}
+
+
+@app.post("/wallet/send/preview")
+def send_preview(body: PreviewIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Shield's opinion on a transfer before the PIN step. Moves no money."""
+    behavior = body.behavior.model_dump() if body.behavior else None
+    decision, recipient = svc.preview_send(db, user, body.recipient_phone, body.amount, behavior)
+    return {"recipient": {"name": recipient.name, "phone": recipient.phone}, "risk": decision.as_dict()}
+
+
+@app.post("/wallet/report")
+def report(body: ReportIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    svc.report_number(db, user, body.phone, body.reason)
+    return {"ok": True}
+
+
+@app.get("/sms/inbox")
+def sms_inbox(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return {"messages": svc.inbox(db, user)}
+
+
+DEMO_MODE = os.getenv("DEMO_MODE", "1") == "1"
+
+
+@app.post("/demo/fake-sms")
+def demo_fake_sms(body: FakeSmsIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """DEMO ONLY: drop a scammer-style fake 'money received' SMS into your own inbox (switch off with DEMO_MODE=0)."""
+    if not DEMO_MODE:
+        raise svc.WalletError("demo_disabled", "Demo tools are switched off", 404)
+    svc.drop_fake_sms(db, user, body.amount, body.from_number)
+    return {"ok": True}
 
 
 @app.post("/wallet/cash-out")

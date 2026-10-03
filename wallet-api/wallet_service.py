@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 import risk_hook
 import security
-from models import AuthSession, Transaction, User, utcnow
+from models import AuthSession, Report, RiskEvent, SmsMessage, Transaction, User, utcnow
 
 PHONE_RE = re.compile(r"^01[3-9]\d{8}$")   # Bangladeshi mobile numbers: 01 + operator digit 3-9 + 8 digits
 PIN_RE = re.compile(r"^\d{5}$")
@@ -175,6 +175,11 @@ def _move(db: Session, kind: str, sender: User, recipient: User, amount: int, ke
     txn = Transaction(kind=kind, sender_id=sender.id, receiver_id=recipient.id, amount=amount,
                       risk_pct=risk_pct, risk_tier=risk_tier, idempotency_key=key)
     db.add(txn)
+    db.flush()
+    if kind == "send_money":     # the true "money received" message: written by the ledger itself, so it cannot be false
+        db.add(SmsMessage(user_id=recipient.id, sender_label="upay", kind="credit_claim", official=True,
+                          claimed_amount=amount, claimed_number=sender.phone,
+                          text=f"You have received Tk {amount:,} from {sender.phone}. TrxID {txn.id:08d}."))
     try:
         db.commit()
     except IntegrityError:        # the same request arrived twice at the same moment
@@ -186,23 +191,47 @@ def _move(db: Session, kind: str, sender: User, recipient: User, amount: int, ke
     return txn
 
 
+def _customer_recipient(db: Session, sender: User, recipient_phone: str) -> User:
+    recipient = db.scalar(select(User).where(User.phone == recipient_phone))
+    if recipient is None or recipient.role != "customer":
+        raise WalletError("recipient_not_found", "No wallet customer found with this number", 404)
+    if recipient.id == sender.id:
+        raise WalletError("self_transfer", "You cannot send money to yourself")
+    return recipient
+
+
+def preview_send(db: Session, sender: User, recipient_phone: str, amount: int, behavior: dict | None = None):
+    """What Shield thinks of a transfer BEFORE the customer enters their PIN. No money moves, no PIN needed."""
+    _check_phone(recipient_phone)
+    _check_amount(amount, MAX_SEND)
+    recipient = _customer_recipient(db, sender, recipient_phone)
+    if sender.balance < amount:
+        raise WalletError("insufficient_balance", "You do not have enough balance", 400)
+    return risk_hook.check_transfer(db, sender, recipient, amount, behavior, source="preview"), recipient
+
+
 def send_money(db: Session, sender: User, recipient_phone: str, amount: int, pin: str,
-               idempotency_key: str | None = None, behavior: dict | None = None) -> Transaction:
+               idempotency_key: str | None = None, behavior: dict | None = None,
+               acknowledged_risk: bool = False) -> Transaction:
     _check_phone(recipient_phone)
     _check_amount(amount, MAX_SEND)
     again = _existing(db, sender, idempotency_key)
     if again:
         return again                                   # a retry of a payment that already went through
     verify_user_pin(db, sender, pin)
-    recipient = db.scalar(select(User).where(User.phone == recipient_phone))
-    if recipient is None or recipient.role != "customer":
-        raise WalletError("recipient_not_found", "No wallet customer found with this number", 404)
-    if recipient.id == sender.id:
-        raise WalletError("self_transfer", "You cannot send money to yourself")
-    decision = risk_hook.check_transfer(db, sender, recipient, amount, behavior)
-    if decision.action not in ALLOWED_NOW:
+    recipient = _customer_recipient(db, sender, recipient_phone)
+    # The server decides again here. It never trusts that the app already showed a preview.
+    decision = risk_hook.check_transfer(db, sender, recipient, amount, behavior, source="send")
+    proceed = decision.action in ALLOWED_NOW or (decision.action == "safety_check" and acknowledged_risk)
+    if not proceed:
         raise RiskInterruption(decision)               # nothing has moved yet
-    return _move(db, "send_money", sender, recipient, amount, idempotency_key, decision.risk_pct, decision.tier)
+    txn = _move(db, "send_money", sender, recipient, amount, idempotency_key, decision.risk_pct, decision.tier)
+    if decision.event_id:
+        event = db.get(RiskEvent, decision.event_id)
+        if event and event.transaction_id is None:
+            event.transaction_id = txn.id
+            db.commit()
+    return txn
 
 
 def cash_out(db: Session, customer: User, agent_phone: str, amount: int, pin: str,
@@ -218,6 +247,44 @@ def cash_out(db: Session, customer: User, agent_phone: str, amount: int, pin: st
     if agent is None or agent.role != "agent":
         raise WalletError("agent_not_found", "No agent found with this number", 404)
     return _move(db, "cash_out", customer, agent, amount, idempotency_key)
+
+
+# ------------------------------------------------------------------ reports and inbox
+def report_number(db: Session, reporter: User, phone: str, reason: str | None = None) -> Report:
+    """A customer flags a number as suspicious. Reports feed the recipient-risk signals for future senders."""
+    _check_phone(phone)
+    target = db.scalar(select(User).where(User.phone == phone))
+    if target is None:
+        raise WalletError("recipient_not_found", "No wallet found with this number", 404)
+    if target.id == reporter.id:
+        raise WalletError("self_report", "You cannot report your own number")
+    report = Report(reporter_id=reporter.id, reported_id=target.id, reason=(reason or "")[:200] or None)
+    db.add(report)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise WalletError("already_reported", "You have already reported this number", 409)
+    return report
+
+
+def inbox(db: Session, user: User, limit: int = 30) -> list[dict]:
+    rows = db.scalars(select(SmsMessage).where(SmsMessage.user_id == user.id)
+                      .order_by(SmsMessage.id.desc()).limit(max(1, min(limit, 100)))).all()
+    return [{"id": m.id, "from": m.sender_label, "text": m.text, "official": m.official,
+             "created_at": m.created_at.isoformat()} for m in rows]
+
+
+def drop_fake_sms(db: Session, user: User, amount: int, claimed_number: str) -> SmsMessage:
+    """DEMO ONLY: put a fake 'money received' message into a customer's inbox, like a scammer's SMS would."""
+    _check_phone(claimed_number)
+    _check_amount(amount, MAX_SEND)
+    msg = SmsMessage(user_id=user.id, sender_label=claimed_number, kind="credit_claim", official=False,
+                     claimed_amount=amount, claimed_number=claimed_number,
+                     text=f"You have received Tk {amount:,} from {claimed_number}. Please return it, it was sent by mistake.")
+    db.add(msg)
+    db.commit()
+    return msg
 
 
 # ------------------------------------------------------------------ views
