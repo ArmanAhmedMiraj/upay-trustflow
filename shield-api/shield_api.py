@@ -22,6 +22,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "transfer_risk"))
+import messages  # noqa: E402
 import safety_check  # noqa: E402
 import scorer  # noqa: E402
 from features import FEATURES  # noqa: E402
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:  # the API still starts, and /health reports the problem
         app.state.artifacts = None
         app.state.load_error = str(exc)
+    app.state.llm = messages.make_llm_from_env()   # None unless LLM_API_KEY is set: templates are used
     yield
 
 
@@ -93,6 +95,9 @@ class RiskResponse(BaseModel):
     scam_type: str | None
     reasons: list[Reason]
     questions: list[Question] = Field(default_factory=list, description="Safety-check questions, only when action = safety_check")
+    message_bn: str | None = Field(default=None, description="Warning for the customer in Bangla (none for low risk)")
+    message_en: str | None = Field(default=None, description="The same warning in English, for analysts")
+    message_source: str | None = Field(default=None, description="'template' or 'llm'")
     model_version: str
     latency_ms: float
 
@@ -122,6 +127,10 @@ class RefineResponse(BaseModel):
     total_log_odds_change: float
     steps: list[RefineStep]
     scam_type: str | None
+    reasons: list[Reason] = Field(default_factory=list)
+    message_bn: str | None = None
+    message_en: str | None = None
+    message_source: str | None = None
 
 
 def _artifacts(request: Request) -> scorer.Artifacts:
@@ -129,6 +138,14 @@ def _artifacts(request: Request) -> scorer.Artifacts:
     if art is None:
         raise HTTPException(status_code=503, detail="Shield model is not loaded; the wallet should allow the transfer")
     return art
+
+
+def _attach_message(result: dict, tier: str, request: Request) -> None:
+    """Add the customer's warning. The decision (tier, action) is already final; this only adds words."""
+    msg = messages.generate_message(tier, result.get("scam_type"), result["reasons"], request.app.state.llm)
+    result["message_bn"] = msg["bn"] if msg else None
+    result["message_en"] = msg["en"] if msg else None
+    result["message_source"] = msg["source"] if msg else None
 
 
 @app.get("/health")
@@ -150,6 +167,7 @@ def risk_score(body: TransferFeatures, request: Request):
     t0 = time.perf_counter()
     result = scorer.score_transfer(body.model_dump(), art)
     result["questions"] = safety_check.questions_for(result["scam_type"]) if result["action"] == "safety_check" else []
+    _attach_message(result, result["tier"], request)
     result["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     return result
 
@@ -169,6 +187,8 @@ def risk_refine(body: RefineRequest, request: Request):
     art = _artifacts(request)
     answers = {a.question_id: a.answer for a in body.answers}
     try:
-        return safety_check.refine(body.features.model_dump(), answers, art)
+        result = safety_check.refine(body.features.model_dump(), answers, art)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    _attach_message(result, result["tier_after"], request)
+    return result

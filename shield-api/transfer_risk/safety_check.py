@@ -139,4 +139,5 @@ def refine(features: dict, answers: dict[str, str], art: scorer.Artifacts | None
         "total_log_odds_change": round(total, 3),
         "steps": steps,
         "scam_type": first["scam_type"],
+        "reasons": first["reasons"],
     }
