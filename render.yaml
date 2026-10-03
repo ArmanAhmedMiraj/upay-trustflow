@@ -1,0 +1,14 @@
+# Render "Blueprint": tells Render how to build and run the whole demo as one web service.
+services:
+  - type: web
+    name: upay-trustflow
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PIN_PEPPER
+        generateValue: true
+      - key: DEMO_MODE
+        value: "1"
+      - key: SEED_ON_START
+        value: "1"

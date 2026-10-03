@@ -1,0 +1,8 @@
+# what the live service needs to run (training-only tools such as scikit-learn are not included)
+fastapi==0.142.2
+uvicorn==0.54.0
+sqlalchemy==2.1.3
+httpx==0.28.1
+numpy==2.4.4
+pandas==3.0.2
+lightgbm>=4.5,<5
