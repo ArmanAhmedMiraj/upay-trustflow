@@ -1,0 +1,236 @@
+{
+  "data": {
+    "users": 6000,
+    "days": 120,
+    "test_rows": 50960,
+    "test_fraud": 943,
+    "test_fraud_rate": 0.01850470957613815
+  },
+  "ranking": {
+    "rules_only_baseline": {
+      "pr_auc": 0.3234582738334382,
+      "roc_auc": 0.8847915780744833,
+      "recall_at_2pct_friction": 0.33510074231177095,
+      "recall_at_1pct_friction": 0.33510074231177095
+    },
+    "logistic_regression_baseline": {
+      "pr_auc": 0.8259705051982085,
+      "roc_auc": 0.9863501764649224,
+      "recall_at_2pct_friction": 0.8398727465535525,
+      "recall_at_1pct_friction": 0.7963944856839873
+    },
+    "lightgbm_raw": {
+      "pr_auc": 0.8296735713281145,
+      "roc_auc": 0.9867458425747123,
+      "recall_at_2pct_friction": 0.8419936373276776,
+      "recall_at_1pct_friction": 0.8133616118769883
+    },
+    "full_system_with_rules": {
+      "pr_auc": 0.8190503886044143,
+      "roc_auc": 0.9864354496989581,
+      "recall_at_2pct_friction": 0.83881230116649,
+      "recall_at_1pct_friction": 0.8112407211028632
+    }
+  },
+  "calibration": {
+    "brier_raw": 0.006157802879575735,
+    "brier_calibrated": 0.006010290230970792,
+    "ece_raw": 0.003611365859596921,
+    "ece_calibrated": 0.0019080560604144078,
+    "reliability_calibrated": [
+      {
+        "band": "0%-2%",
+        "predicted_mean": 0.0012306846801050405,
+        "actual_fraud_rate": 0.0024000165518382886,
+        "n": 48333
+      },
+      {
+        "band": "2%-5%",
+        "predicted_mean": 0.031753262116786786,
+        "actual_fraud_rate": 0.04186046511627907,
+        "n": 860
+      },
+      {
+        "band": "5%-10%",
+        "predicted_mean": 0.06298613027862439,
+        "actual_fraud_rate": 0.05342237061769616,
+        "n": 599
+      },
+      {
+        "band": "10%-20%",
+        "predicted_mean": 0.14092925594654673,
+        "actual_fraud_rate": 0.18,
+        "n": 250
+      },
+      {
+        "band": "20%-40%",
+        "predicted_mean": 0.2609344026103281,
+        "actual_fraud_rate": 0.2922077922077922,
+        "n": 154
+      },
+      {
+        "band": "40%-60%",
+        "predicted_mean": 0.45212395738630856,
+        "actual_fraud_rate": 0.3584905660377358,
+        "n": 53
+      },
+      {
+        "band": "60%-80%",
+        "predicted_mean": 0.6544740237232354,
+        "actual_fraud_rate": 0.6846153846153846,
+        "n": 130
+      },
+      {
+        "band": "80%-100%",
+        "predicted_mean": 0.9607029290930306,
+        "actual_fraud_rate": 0.9655765920826161,
+        "n": 581
+      }
+    ]
+  },
+  "tiers": {
+    "thresholds": {
+      "note": 0.1,
+      "high": 0.3,
+      "very_high": 0.6
+    },
+    "friction_budget_on_genuine": {
+      "note": 0.06,
+      "high": 0.02,
+      "very_high": 0.005
+    },
+    "minimum_probability": {
+      "note": 0.1,
+      "high": 0.3,
+      "very_high": 0.6
+    }
+  },
+  "operating_points": {
+    "note": {
+      "genuine_friction_rate": 0.008177219745286603,
+      "fraud_recall_count": 0.8048780487804879,
+      "fraud_recall_value": 0.8992775917467075,
+      "precision": 0.6498287671232876,
+      "genuine_bdt_affected": 1807342.0
+    },
+    "high": {
+      "genuine_friction_rate": 0.002039306635743847,
+      "fraud_recall_count": 0.7200424178154825,
+      "fraud_recall_value": 0.8206373762298038,
+      "precision": 0.8693982074263764,
+      "genuine_bdt_affected": 448465.0
+    },
+    "very_high": {
+      "genuine_friction_rate": 0.0012195853409840654,
+      "fraud_recall_count": 0.689289501590668,
+      "fraud_recall_value": 0.7791838856682725,
+      "precision": 0.9142053445850914,
+      "genuine_bdt_affected": 204354.0
+    }
+  },
+  "recall_by_scam_type_at_high_tier": {
+    "advance_payment": 0.6884422110552764,
+    "emergency_relative": 0.7448275862068966,
+    "fake_officer": 0.7046413502109705,
+    "prize_fee": 0.6428571428571429,
+    "return_by_mistake": 0.78
+  },
+  "impact_by_heeding_rate": {
+    "0.3": {
+      "fraud_bdt_attempted": 3956627.0,
+      "fraud_bdt_stopped": 974086.7999999999,
+      "genuine_transfers_interrupted": 102,
+      "assumed_friction_cost_bdt": 1530.0,
+      "net_benefit_bdt": 972556.7999999999
+    },
+    "0.5": {
+      "fraud_bdt_attempted": 3956627.0,
+      "fraud_bdt_stopped": 1623478.0,
+      "genuine_transfers_interrupted": 102,
+      "assumed_friction_cost_bdt": 1530.0,
+      "net_benefit_bdt": 1621948.0
+    },
+    "0.7": {
+      "fraud_bdt_attempted": 3956627.0,
+      "fraud_bdt_stopped": 2272869.1999999997,
+      "genuine_transfers_interrupted": 102,
+      "assumed_friction_cost_bdt": 1530.0,
+      "net_benefit_bdt": 2271339.1999999997
+    }
+  },
+  "scam_type_accuracy": 0.5440084835630965,
+  "fairness": {
+    "newer_sender_(<35_transfers)": {
+      "genuine_friction_rate": 0.004265908282971916,
+      "fraud_recall": 0.7123287671232876,
+      "n_genuine": 8439,
+      "n_fraud": 292
+    },
+    "established_sender_(35+)": {
+      "genuine_friction_rate": 0.0015873779402568666,
+      "fraud_recall": 0.7235023041474654,
+      "n_genuine": 41578,
+      "n_fraud": 651
+    },
+    "low_balance_(below_median)": {
+      "genuine_friction_rate": 0.0026415849509705824,
+      "fraud_recall": 0.7165991902834008,
+      "n_genuine": 24985,
+      "n_fraud": 494
+    },
+    "high_balance_(above_median)": {
+      "genuine_friction_rate": 0.0014381591562799617,
+      "fraud_recall": 0.7238307349665924,
+      "n_genuine": 25032,
+      "n_fraud": 449
+    },
+    "night_(22:00-05:00)": {
+      "genuine_friction_rate": 0.0029160591543428453,
+      "fraud_recall": 0.7777777777777778,
+      "n_genuine": 4801,
+      "n_fraud": 117
+    },
+    "daytime": {
+      "genuine_friction_rate": 0.00194621372965322,
+      "fraud_recall": 0.711864406779661,
+      "n_genuine": 45216,
+      "n_fraud": 826
+    }
+  },
+  "evasion_fraud_recall_at_high_tier": {
+    "none": 0.7200424178154825,
+    "split_amount": 0.6553552492046659,
+    "normal_hour": 0.7158006362672322,
+    "aged_wallet": 0.24602332979851538,
+    "no_sms_story": 0.6786850477200425,
+    "combined": 0.0
+  },
+  "network_learning_mean_risk_by_prior_reports": {
+    "0 reports": 0.34617419591402626,
+    "1-2 reports": 0.5323686412786657,
+    "3+ reports": 0.9555868186621371
+  },
+  "latency_ms_per_transfer": 4.1,
+  "leave_one_scam_type_out": {
+    "advance_payment": {
+      "recall_unseen_script_at_2pct_friction": 0.8341708542713567,
+      "recall_when_trained_on_all": 0.8442211055276382
+    },
+    "emergency_relative": {
+      "recall_unseen_script_at_2pct_friction": 0.8620689655172413,
+      "recall_when_trained_on_all": 0.8482758620689655
+    },
+    "fake_officer": {
+      "recall_unseen_script_at_2pct_friction": 0.8016877637130801,
+      "recall_when_trained_on_all": 0.8312236286919831
+    },
+    "prize_fee": {
+      "recall_unseen_script_at_2pct_friction": 0.7857142857142857,
+      "recall_when_trained_on_all": 0.8035714285714286
+    },
+    "return_by_mistake": {
+      "recall_unseen_script_at_2pct_friction": 0.624,
+      "recall_when_trained_on_all": 0.864
+    }
+  }
+}

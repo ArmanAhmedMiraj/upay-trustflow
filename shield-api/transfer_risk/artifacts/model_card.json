@@ -1,0 +1,47 @@
+{
+  "version": "v1",
+  "features": [
+    "amount_zscore",
+    "balance_share",
+    "is_first_time_recipient",
+    "is_round_amount",
+    "hour_unusual",
+    "log_mins_since_incoming",
+    "hesitation_secs",
+    "amount_edits",
+    "on_call",
+    "sender_history_count",
+    "recipient_age_days",
+    "first_time_senders_24h",
+    "recipient_inflow_count_24h",
+    "recipient_outflow_ratio_24h",
+    "recipient_prior_txns",
+    "report_count",
+    "report_rate",
+    "sms_claims_credit",
+    "sms_mentions_recipient",
+    "ledger_confirms_credit",
+    "claim_ledger_mismatch",
+    "claim_mismatch_on_recipient",
+    "sms_official_sender"
+  ],
+  "seed": 42,
+  "train_days": [
+    30,
+    75
+  ],
+  "calibration_days": [
+    75,
+    100
+  ],
+  "test_days": [
+    100,
+    120
+  ],
+  "friction_budget": {
+    "note": 0.06,
+    "high": 0.02,
+    "very_high": 0.005
+  },
+  "data": "fully synthetic; see docs/synthetic-assumptions.md"
+}
