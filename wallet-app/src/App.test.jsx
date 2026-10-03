@@ -12,7 +12,7 @@ vi.mock('./api.js', async (importOriginal) => {
     ...real,
     setToken: vi.fn(),
     setUnauthorizedHandler: vi.fn((h) => { unauthorizedHandler = h }),
-    api: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(), transactions: vi.fn(), addMoney: vi.fn() },
+    api: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(), transactions: vi.fn(), addMoney: vi.fn(), analystCases: vi.fn(), impact: vi.fn(), modelReport: vi.fn(), resetDemo: vi.fn() },
   }
 })
 import { api, setToken } from './api.js'
@@ -127,5 +127,29 @@ describe('App navigation', () => {
     api.me.mockResolvedValue({ user: { ...RAHIM, balance: 39111 } })
     await user.click(screen.getByRole('button', { name: t('close') }))
     await waitFor(() => expect(screen.getByTestId('balance')).toHaveTextContent('৳39,111'))
+  })
+})
+
+describe('App roles', () => {
+  it('shows the analyst console to an analyst, not the customer home', async () => {
+    localStorage.setItem('upay_token', 'saved')
+    api.me.mockResolvedValue({ user: { id: 9, name: 'Nadia Rahman', phone: '01911000001', role: 'analyst', balance: 0 } })
+    api.analystCases.mockResolvedValue({ cases: [] })
+    render(<App />)
+    expect(await screen.findByText('upay Shield · Analyst console')).toBeInTheDocument()
+    expect(screen.queryByTestId('balance')).not.toBeInTheDocument()
+  })
+
+  it('tells the analyst to log in again after a demo reset', async () => {
+    localStorage.setItem('upay_token', 'saved')
+    api.me.mockResolvedValue({ user: { id: 9, name: 'Nadia Rahman', phone: '01911000001', role: 'analyst', balance: 0 } })
+    api.analystCases.mockResolvedValue({ cases: [] })
+    api.resetDemo.mockResolvedValue({ users: 1 })
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Reset demo' }))
+    await user.click(screen.getByRole('button', { name: 'Click again to wipe and reset' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(t('demoResetDone'))
+    expect(localStorage.getItem('upay_token')).toBeNull()
   })
 })

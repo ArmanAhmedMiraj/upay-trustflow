@@ -4,9 +4,10 @@ import { errorText } from '../i18n.js'
 import { isValidPhone, isValidPin } from '../format.js'
 
 const DEMO_ACCOUNTS = [
-  { label: 'Rahim', phone: '01711000001' },
-  { label: 'Nusrat', phone: '01711000005' },
-  { label: 'Sumon', phone: '01711000006' },
+  { label: 'Rahim', phone: '01711000001', pin: '12345' },
+  { label: 'Nusrat', phone: '01711000005', pin: '12345' },
+  { label: 'Sumon', phone: '01711000006', pin: '12345' },
+  { label: 'Fraud analyst', phone: '01911000001', pin: '99999' },
 ]
 const SHOW_DEMO = import.meta.env?.VITE_DEMO !== '0'
 
@@ -75,7 +76,7 @@ export default function Login({ t, lang, onToggleLang, onLoggedIn, notice }) {
         <div className="demo">
           <span>{t('demoLogin')}</span>
           {DEMO_ACCOUNTS.map((a) => (
-            <button key={a.phone} type="button" className="chip" onClick={() => { setPhone(a.phone); setPin('12345'); setError('') }}>{a.label}</button>
+            <button key={a.phone} type="button" className="chip" onClick={() => { setPhone(a.phone); setPin(a.pin); setError('') }}>{a.label}</button>
           ))}
         </div>
       )}

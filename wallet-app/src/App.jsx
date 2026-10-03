@@ -7,6 +7,7 @@ import SendFlow from './screens/SendFlow.jsx'
 import HoldScreen from './screens/HoldScreen.jsx'
 import Inbox from './screens/Inbox.jsx'
 import History from './screens/History.jsx'
+import Console from './screens/Console.jsx'
 
 const TOKEN_KEY = 'upay_token'
 const LANG_KEY = 'upay_lang'
@@ -74,6 +75,7 @@ export default function App() {
 
   // a plain function (not a component) so that screens keep their state when the app re-renders
   const signed = () => {
+    if (user.role === 'analyst') return <Console user={user} onLogout={handleLogout} onDemoReset={() => endSession('demoResetDone')} />
     if (route.name === 'send') {
       return (
         <SendFlow user={user} t={t} lang={lang} onClose={goHome} onSent={setBalance}
@@ -87,7 +89,7 @@ export default function App() {
   }
 
   return (
-    <div className="stage">
+    <div className={`stage ${user?.role === 'analyst' ? 'wide' : ''}`}>
       <div className="phone">
         {booting ? (
           <div className="center-note">{t('working')}</div>

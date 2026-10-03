@@ -16,7 +16,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+import impact as impact_metrics
 import wallet_service as svc
+import database
 from database import get_db
 from models import User
 
@@ -189,6 +191,18 @@ def analyst_reject(txn_id: int, body: DecisionIn | None = None, user: User = Dep
     return {"transaction": txn_out(svc.analyst_decide(db, user, txn_id, False, body.note if body else None))}
 
 
+@app.get("/analyst/impact")
+def analyst_impact(hours: int = 168, user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    """What Shield did for customers and for upay, measured from real activity in the wallet."""
+    return impact_metrics.impact(db, hours)
+
+
+@app.get("/analyst/model-report")
+def analyst_model_report(user: User = Depends(analyst_user)):
+    """Offline test results (synthetic data where the truth is known)."""
+    return {"report": impact_metrics.model_report()}
+
+
 @app.post("/wallet/send/preview")
 def send_preview(body: PreviewIn, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Shield's opinion on a transfer before the PIN step. Moves no money."""
@@ -227,6 +241,14 @@ def demo_release_holds(user: User = Depends(current_user), db: Session = Depends
     if not DEMO_MODE:
         raise svc.WalletError("demo_disabled", "Demo tools are switched off", 404)
     return {"released": svc.release_holds_now(db, user)}
+
+
+@app.post("/demo/reset")
+def demo_reset(user: User = Depends(analyst_user)):
+    """DEMO ONLY (analysts): wipe everything and rebuild the demo world, ready to present."""
+    if not DEMO_MODE:
+        raise svc.WalletError("demo_disabled", "Demo tools are switched off", 404)
+    return svc.reset_demo(database.engine, database.SessionLocal)
 
 
 @app.post("/wallet/cash-out")

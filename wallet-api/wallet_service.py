@@ -433,3 +433,23 @@ def release_holds_now(db: Session, user: User) -> int:
         t.release_at = utcnow() - timedelta(seconds=1)
     db.commit()
     return settle_due_holds(db)
+
+
+def reset_demo(engine, session_factory, users: int = 1500, days: int = 60, log=lambda *_: None) -> dict:
+    """DEMO ONLY: wipe the wallet database and build the demo world again (about 5 seconds)."""
+    import pathlib
+    import sys
+    root = pathlib.Path(__file__).resolve().parents[1]
+    for sub in ("simulator",):
+        if str(root / sub) not in sys.path:
+            sys.path.insert(0, str(root / sub))
+    import seed_wallet                                     # the same script that is run from the command line
+    from database import Base
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    db = session_factory()
+    try:
+        info = seed_wallet.seed(db, n_users=users, days=days, log=log)
+    finally:
+        db.close()
+    return {"users": info["users"], "transactions": info["transactions"]}
