@@ -22,6 +22,7 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "transfer_risk"))
+import safety_check  # noqa: E402
 import scorer  # noqa: E402
 from features import FEATURES  # noqa: E402
 
@@ -78,14 +79,49 @@ class Reason(BaseModel):
     share_pct: int | None = Field(default=None, description="Share of the model's push towards 'risky' (model reasons only)")
 
 
+class Question(BaseModel):
+    id: str
+    risky_answer: str = Field(description="Which answer is the worrying one for this question")
+    bn: str = Field(description="Question text in Bangla (shown to the customer)")
+    en: str = Field(description="Question text in English (for analysts and judges)")
+
+
 class RiskResponse(BaseModel):
     risk_pct: int
     tier: str = Field(description="low, note, high or very_high")
     action: str = Field(description="allow, allow_with_note, safety_check or hold_30min")
     scam_type: str | None
     reasons: list[Reason]
+    questions: list[Question] = Field(default_factory=list, description="Safety-check questions, only when action = safety_check")
     model_version: str
     latency_ms: float
+
+
+class Answer(BaseModel):
+    question_id: str
+    answer: str = Field(description="yes, no or not_sure")
+
+
+class RefineRequest(BaseModel):
+    features: TransferFeatures
+    answers: list[Answer]
+
+
+class RefineStep(BaseModel):
+    question_id: str
+    answer: str
+    log_odds_change: float
+
+
+class RefineResponse(BaseModel):
+    risk_before_pct: int
+    risk_after_pct: int
+    tier_before: str
+    tier_after: str
+    action_after: str
+    total_log_odds_change: float
+    steps: list[RefineStep]
+    scam_type: str | None
 
 
 def _artifacts(request: Request) -> scorer.Artifacts:
@@ -113,5 +149,26 @@ def risk_score(body: TransferFeatures, request: Request):
     art = _artifacts(request)
     t0 = time.perf_counter()
     result = scorer.score_transfer(body.model_dump(), art)
+    result["questions"] = safety_check.questions_for(result["scam_type"]) if result["action"] == "safety_check" else []
     result["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     return result
+
+
+@app.get("/risk/questions", response_model=list[Question])
+def risk_questions(scam_type: str | None = None):
+    """The safety-check questions for a scam type (or the fallback pair when the type is unknown)."""
+    return safety_check.questions_for(scam_type)
+
+
+@app.post("/risk/refine", response_model=RefineResponse)
+def risk_refine(body: RefineRequest, request: Request):
+    """Re-score a transfer using the customer's safety-check answers.
+
+    The starting score is recomputed from the features, so it cannot be tampered with.
+    """
+    art = _artifacts(request)
+    answers = {a.question_id: a.answer for a in body.answers}
+    try:
+        return safety_check.refine(body.features.model_dump(), answers, art)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
