@@ -4,7 +4,7 @@
 
 Built for **AI Dev Fest 2026 (DIU CPC × upay)**. Two modules: **Shield** (Track 01, Trust & Risk) and **Agent Cash Forecasting** (Track 05, Merchant & Agent). All data is synthetic.
 
-- **Live demo:** https://YOUR-SERVICE.onrender.com  *(the free plan sleeps when idle; the first visit takes about a minute)*
+- **Live demo:** https://upay-trustflow.onrender.com/  *(the free plan sleeps when idle; the first visit takes about a minute)*
 - **Demo accounts:** tap a name on the login screen. Customers use PIN `12345`; the fraud analyst uses `99999`.
 - **Project report and demo video:** submitted with this repository.
 
