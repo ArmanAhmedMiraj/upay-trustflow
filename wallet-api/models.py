@@ -121,3 +121,20 @@ class RiskEvent(Base):
     shield_available: Mapped[bool] = mapped_column(Boolean, default=True)
     transaction_id: Mapped[int | None] = mapped_column(ForeignKey("transactions.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class RefillRequest(Base):
+    """An agent asking upay's operations team to bring cash or e-float."""
+
+    __tablename__ = "refill_requests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agent_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    scenario_day: Mapped[int] = mapped_column(Integer)
+    cash_bdt: Mapped[int] = mapped_column(Integer)
+    float_bdt: Mapped[int] = mapped_column(Integer)
+    needed_by: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    status: Mapped[str] = mapped_column(String(12), default="open")          # open or dispatched
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    dispatched_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)

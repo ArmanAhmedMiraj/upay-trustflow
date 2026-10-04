@@ -1,0 +1,201 @@
+{
+  "quality": {
+    "pinball_p50_model": 688.0721854296703,
+    "pinball_p50_same_hour_last_week": 2092.8780815972223,
+    "pinball_p90_model": 373.148321604678,
+    "pinball_p90_same_hour_last_week": 2115.9274357638888,
+    "p90_coverage_cash_out": 0.9271875,
+    "p90_coverage_cash_in": 0.8931076388888889,
+    "p90_coverage_festival_hours": 0.9509837962962963,
+    "test_hours": 57600
+  },
+  "policy": {
+    "plan_mix": 0.6,
+    "tradeoff": [
+      {
+        "mix": 0.0,
+        "missed_share": 0.035824138834152926,
+        "avg_cash_held": 38769.255166911615,
+        "runout_agent_days": 907,
+        "topups_bdt": 166080393.23595455
+      },
+      {
+        "mix": 0.3,
+        "missed_share": 0.008461817597323031,
+        "avg_cash_held": 56791.728502862374,
+        "runout_agent_days": 311,
+        "topups_bdt": 175959683.46458906
+      },
+      {
+        "mix": 0.6,
+        "missed_share": 0.0014334697275489275,
+        "avg_cash_held": 78506.2996724128,
+        "runout_agent_days": 77,
+        "topups_bdt": 180213283.12815702
+      },
+      {
+        "mix": 1.0,
+        "missed_share": 0.00010138959907068137,
+        "avg_cash_held": 110110.46857297934,
+        "runout_agent_days": 7,
+        "topups_bdt": 183594486.85785156
+      }
+    ],
+    "cycles": 19,
+    "agent_cycles": 2280,
+    "commission_rate": 0.005,
+    "guess_from_last_week_plus_20pct": {
+      "unmet_bdt": 78053776.2,
+      "demand_bdt": 295527953.0,
+      "runout_hours": 7320,
+      "runout_agent_days": 910,
+      "topups_bdt": 98063352.19999999,
+      "avg_cash_held": 86711.3704495614,
+      "commission_lost_bdt": 390268.881,
+      "commission_earned_bdt": 1087370.884,
+      "by_day_type": {
+        "normal": {
+          "days": 8,
+          "missed_share": 0.0004943015673133291
+        },
+        "payday": {
+          "days": 2,
+          "missed_share": 0.26631704441303056
+        },
+        "festival": {
+          "days": 6,
+          "missed_share": 0.45445900945070894
+        },
+        "after_festival": {
+          "days": 3,
+          "missed_share": 0.0
+        }
+      },
+      "scale": 1.2
+    },
+    "guess_with_same_average_cash": {
+      "unmet_bdt": 82677817.54023866,
+      "demand_bdt": 295527953.0,
+      "runout_hours": 7833,
+      "runout_agent_days": 930,
+      "topups_bdt": 93372630.4173623,
+      "avg_cash_held": 78506.29988353218,
+      "commission_lost_bdt": 413389.08770119335,
+      "commission_earned_bdt": 1064250.6772988066,
+      "by_day_type": {
+        "normal": {
+          "days": 8,
+          "missed_share": 0.0012596808397156525
+        },
+        "payday": {
+          "days": 2,
+          "missed_share": 0.3116782077259634
+        },
+        "festival": {
+          "days": 6,
+          "missed_share": 0.47462162529512714
+        },
+        "after_festival": {
+          "days": 3,
+          "missed_share": 0.0
+        }
+      },
+      "scale": 1.116847745142877
+    },
+    "forecast_driven": {
+      "unmet_bdt": 423630.37427000224,
+      "demand_bdt": 295527953.0,
+      "runout_hours": 158,
+      "runout_agent_days": 77,
+      "topups_bdt": 180213283.12815702,
+      "avg_cash_held": 78506.2996724128,
+      "commission_lost_bdt": 2118.1518713500113,
+      "commission_earned_bdt": 1475521.61312865,
+      "by_day_type": {
+        "normal": {
+          "days": 8,
+          "missed_share": 0.0037012276197786647
+        },
+        "payday": {
+          "days": 2,
+          "missed_share": 0.0027137854118808396
+        },
+        "festival": {
+          "days": 6,
+          "missed_share": 0.0
+        },
+        "after_festival": {
+          "days": 3,
+          "missed_share": 0.0
+        }
+      }
+    }
+  },
+  "coverage": [
+    {
+      "area": "Jatrabari",
+      "lat": 23.7089,
+      "lng": 90.4438,
+      "agents_here": 3,
+      "demand_per_agent_per_day": 197279,
+      "times_city_median": 1.85,
+      "new_agent_would_take_per_day": 147959,
+      "turned_away_share": 0.241,
+      "reason": "Each of the 3 agents near Jatrabari handles about 1.8x the city's typical daily cash-out; a new agent would take roughly \u09f3147,959 a day."
+    },
+    {
+      "area": "Motijheel",
+      "lat": 23.733,
+      "lng": 90.4242,
+      "agents_here": 5,
+      "demand_per_agent_per_day": 176415,
+      "times_city_median": 1.65,
+      "new_agent_would_take_per_day": 147012,
+      "turned_away_share": 0.239,
+      "reason": "Each of the 5 agents near Motijheel handles about 1.7x the city's typical daily cash-out; a new agent would take roughly \u09f3147,012 a day."
+    },
+    {
+      "area": "Farmgate",
+      "lat": 23.7556,
+      "lng": 90.3907,
+      "agents_here": 16,
+      "demand_per_agent_per_day": 145067,
+      "times_city_median": 1.36,
+      "new_agent_would_take_per_day": 136533,
+      "turned_away_share": 0.316,
+      "reason": "Each of the 16 agents near Farmgate handles about 1.4x the city's typical daily cash-out; a new agent would take roughly \u09f3136,533 a day."
+    },
+    {
+      "area": "Tejgaon",
+      "lat": 23.7594,
+      "lng": 90.4056,
+      "agents_here": 1,
+      "demand_per_agent_per_day": 271534,
+      "times_city_median": 2.54,
+      "new_agent_would_take_per_day": 135767,
+      "turned_away_share": 0.327,
+      "reason": "Each of the 1 agents near Tejgaon handles about 2.5x the city's typical daily cash-out; a new agent would take roughly \u09f3135,767 a day."
+    },
+    {
+      "area": "Dhanmondi",
+      "lat": 23.7495,
+      "lng": 90.3769,
+      "agents_here": 3,
+      "demand_per_agent_per_day": 155352,
+      "times_city_median": 1.46,
+      "new_agent_would_take_per_day": 116514,
+      "turned_away_share": 0.227,
+      "reason": "Each of the 3 agents near Dhanmondi handles about 1.5x the city's typical daily cash-out; a new agent would take roughly \u09f3116,514 a day."
+    }
+  ],
+  "agents": 120,
+  "days": 90,
+  "train_days": [
+    28,
+    69
+  ],
+  "test_days": [
+    70,
+    89
+  ]
+}

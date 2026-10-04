@@ -7,6 +7,7 @@ const DEMO_ACCOUNTS = [
   { label: 'Rahim', phone: '01711000001', pin: '12345' },
   { label: 'Nusrat', phone: '01711000005', pin: '12345' },
   { label: 'Sumon', phone: '01711000006', pin: '12345' },
+  { label: 'Agent Babul', phone: '01811000001', pin: '12345' },
   { label: 'Fraud analyst', phone: '01911000001', pin: '99999' },
 ]
 const SHOW_DEMO = import.meta.env?.VITE_DEMO !== '0'

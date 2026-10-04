@@ -8,6 +8,7 @@ import HoldScreen from './screens/HoldScreen.jsx'
 import Inbox from './screens/Inbox.jsx'
 import History from './screens/History.jsx'
 import Console from './screens/Console.jsx'
+import AgentHome from './screens/AgentHome.jsx'
 
 const TOKEN_KEY = 'upay_token'
 const LANG_KEY = 'upay_lang'
@@ -76,6 +77,7 @@ export default function App() {
   // a plain function (not a component) so that screens keep their state when the app re-renders
   const signed = () => {
     if (user.role === 'analyst') return <Console user={user} onLogout={handleLogout} onDemoReset={() => endSession('demoResetDone')} />
+    if (user.role === 'agent') return <AgentHome user={user} t={t} lang={lang} onToggleLang={toggleLang} onLogout={handleLogout} />
     if (route.name === 'send') {
       return (
         <SendFlow user={user} t={t} lang={lang} onClose={goHome} onSent={setBalance}

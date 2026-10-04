@@ -95,3 +95,11 @@ def test_the_phone_app_is_served_from_the_same_address(live):
     assert live.get("/sw.js").status_code == 200
     assert live.get("/icons/icon-512.png").status_code == 200
     assert live.get("/me").status_code == 401                 # API routes still win over the static files
+
+
+def test_module_two_works_through_the_one_address_setup(live):
+    nadia = login(live, "01911000001", "99999")
+    festival = live.get("/ops/agents?scenario=festival", headers=nadia).json()
+    assert festival["counts"]["red"] > 100 and len(festival["agents"]) == 120
+    babul = login(live, "01811000001")
+    assert live.get("/agent/forecast?scenario=festival", headers=babul).json()["status"] == "red"

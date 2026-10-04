@@ -9,6 +9,8 @@ Then open http://localhost:8000/docs to try it in the browser.
 from __future__ import annotations
 
 import os
+import pathlib
+import sys
 
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,10 +19,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import impact as impact_metrics
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "shield-api" / "liquidity"))   # Module 2 (agent cash forecasting)
 import wallet_service as svc
 import database
 from database import get_db
-from models import User
+from models import RefillRequest, User, utcnow
+from sqlalchemy import select
 
 app = FastAPI(title="upay-trustflow Wallet API", version="1.0",
               description="A prototype wallet. All data is synthetic. Shield plugs in through risk_hook.")
@@ -201,6 +205,116 @@ def analyst_impact(hours: int = 168, user: User = Depends(analyst_user), db: Ses
 def analyst_model_report(user: User = Depends(analyst_user)):
     """Offline test results (synthetic data where the truth is known)."""
     return {"report": impact_metrics.model_report()}
+
+
+# ------------------------------------------------------------------ Module 2: agent cash forecasting
+def _world():
+    import liq_service                      # loaded on first use; it needs the trained models in shield-api/liquidity/artifacts
+    return liq_service.get_world()
+
+
+def _day(day: int | None, scenario: str | None = None) -> int:
+    import liq_service
+    chosen = liq_service.SCENARIOS.get(scenario) if scenario else day
+    chosen = liq_service.SCENARIOS["festival"] if chosen is None else chosen
+    if not (liq_service.DAY_MIN <= chosen <= liq_service.DAY_MAX):
+        raise svc.WalletError("invalid_day", f"day must be between {liq_service.DAY_MIN} and {liq_service.DAY_MAX}", 422)
+    return chosen
+
+
+def agent_user(user: User = Depends(current_user)) -> User:
+    if user.role != "agent":
+        raise svc.WalletError("forbidden", "This area is for agents only", 403)
+    return user
+
+
+@app.get("/ops/agents")
+def ops_agents(day: int | None = None, scenario: str | None = None, user: User = Depends(analyst_user)):
+    """Every agent: cash now, cash needed, when it runs out and how much to add."""
+    return _world().overview(_day(day, scenario))
+
+
+@app.get("/ops/agents/{agent_id}")
+def ops_agent(agent_id: int, day: int | None = None, scenario: str | None = None, user: User = Depends(analyst_user)):
+    w = _world()
+    if not (0 <= agent_id < len(w.agents)):
+        raise svc.WalletError("agent_not_found", "No such agent", 404)
+    return w.detail(agent_id, _day(day, scenario))
+
+
+@app.get("/ops/coverage")
+def ops_coverage(user: User = Depends(analyst_user)):
+    """Where another agent would help most, and the evidence behind the forecasts."""
+    w = _world()
+    return {"recommendations": w.report["coverage"], "agents": [{"agent_id": int(a.agent_id), "area": a.area, "lat": round(float(a.lat), 4), "lng": round(float(a.lng), 4)} for a in w.agents.itertuples()]}
+
+
+@app.get("/ops/liquidity-report")
+def ops_liquidity_report(user: User = Depends(analyst_user)):
+    import liq_service
+    r = _world().report
+    return {"quality": r["quality"], "policy": r["policy"], "agents": r["agents"], "train_days": r["train_days"], "test_days": r["test_days"],
+            "scenarios": liq_service.SCENARIOS, "scenario_text": liq_service.SCENARIO_TEXT}
+
+
+@app.get("/agent/forecast")
+def agent_forecast(day: int | None = None, scenario: str | None = None, user: User = Depends(agent_user)):
+    """An agent's own cash forecast, in plain words, English and Bangla."""
+    w = _world()
+    agent_id = w.agent_for_phone(user.phone)
+    if agent_id is None:
+        raise svc.WalletError("agent_not_found", "This agent is not part of the forecasting demo", 404)
+    return w.detail(agent_id, _day(day, scenario))
+
+
+class RefillIn(BaseModel):
+    day: int | None = None
+    scenario: str | None = None
+
+
+def _request_out(r, agent=None) -> dict:
+    return {"id": r.id, "agent": {"name": agent.name, "phone": agent.phone} if agent else None, "cash_bdt": r.cash_bdt, "float_bdt": r.float_bdt,
+            "needed_by": r.needed_by, "status": r.status, "created_at": r.created_at.isoformat(), "scenario_day": r.scenario_day}
+
+
+@app.post("/agent/refill-request")
+def agent_refill_request(body: RefillIn, user: User = Depends(agent_user), db: Session = Depends(get_db)):
+    """Ask upay to bring the recommended cash and e-float."""
+    w = _world()
+    agent_id = w.agent_for_phone(user.phone)
+    if agent_id is None:
+        raise svc.WalletError("agent_not_found", "This agent is not part of the forecasting demo", 404)
+    s = w.status(agent_id, _day(body.day, body.scenario))
+    if s["refill_cash"] <= 0 and s["refill_float"] <= 0:
+        raise svc.WalletError("nothing_needed", "No refill is needed right now", 409)
+    r = RefillRequest(agent_user_id=user.id, scenario_day=s["day"], cash_bdt=s["refill_cash"], float_bdt=s["refill_float"], needed_by=s["runout_label"])
+    db.add(r)
+    db.commit()
+    return {"request": _request_out(r, user)}
+
+
+@app.get("/agent/refill-requests")
+def agent_refill_requests(user: User = Depends(agent_user), db: Session = Depends(get_db)):
+    rows = db.scalars(select(RefillRequest).where(RefillRequest.agent_user_id == user.id).order_by(RefillRequest.id.desc()).limit(20)).all()
+    return {"requests": [_request_out(r, user) for r in rows]}
+
+
+@app.get("/ops/refill-requests")
+def ops_refill_requests(user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    rows = db.scalars(select(RefillRequest).order_by(RefillRequest.status.desc(), RefillRequest.id.desc()).limit(50)).all()
+    return {"requests": [_request_out(r, db.get(User, r.agent_user_id)) for r in rows]}
+
+
+@app.post("/ops/refill-requests/{request_id}/dispatch")
+def ops_dispatch(request_id: int, user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    r = db.get(RefillRequest, request_id)
+    if r is None:
+        raise svc.WalletError("request_not_found", "No such request", 404)
+    if r.status != "open":
+        raise svc.WalletError("already_decided", "This request was already handled", 409)
+    r.status, r.dispatched_at, r.dispatched_by = "dispatched", utcnow(), user.id
+    db.commit()
+    return {"request": _request_out(r, db.get(User, r.agent_user_id))}
 
 
 @app.post("/wallet/send/preview")

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { errorText, makeT } from '../i18n.js'
 import { formatPhone, formatRemaining, formatTaka, formatWhen, parseApiTime } from '../format.js'
+import AgentsTab from './AgentsTab.jsx'
 
 export const SCAM_NAMES = {
   return_by_mistake: "Return money 'sent by mistake'",
@@ -52,6 +53,7 @@ export default function Console({ user, onLogout, onDemoReset }) {
         <nav className="console-tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'cases'} className={tab === 'cases' ? 'on' : ''} onClick={() => setTab('cases')}>Cases</button>
           <button role="tab" aria-selected={tab === 'impact'} className={tab === 'impact' ? 'on' : ''} onClick={() => setTab('impact')}>Impact</button>
+          <button role="tab" aria-selected={tab === 'agents'} className={tab === 'agents' ? 'on' : ''} onClick={() => setTab('agents')}>Agents</button>
         </nav>
         <div className="console-actions">
           <button className="lang dark" onClick={reset} disabled={resetting}>
@@ -61,7 +63,7 @@ export default function Console({ user, onLogout, onDemoReset }) {
         </div>
       </header>
       {error && <p className="error" role="alert">{error}</p>}
-      {tab === 'cases' ? <Cases /> : <Impact />}
+      {tab === 'cases' ? <Cases /> : tab === 'impact' ? <Impact /> : <AgentsTab />}
     </div>
   )
 }

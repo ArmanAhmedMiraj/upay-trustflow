@@ -12,7 +12,7 @@ vi.mock('./api.js', async (importOriginal) => {
     ...real,
     setToken: vi.fn(),
     setUnauthorizedHandler: vi.fn((h) => { unauthorizedHandler = h }),
-    api: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(), transactions: vi.fn(), addMoney: vi.fn(), analystCases: vi.fn(), impact: vi.fn(), modelReport: vi.fn(), resetDemo: vi.fn() },
+    api: { me: vi.fn(), login: vi.fn(), register: vi.fn(), logout: vi.fn(), transactions: vi.fn(), addMoney: vi.fn(), analystCases: vi.fn(), impact: vi.fn(), modelReport: vi.fn(), resetDemo: vi.fn(), agentForecast: vi.fn(), agentRefillRequests: vi.fn(), agentRefillRequest: vi.fn() },
   }
 })
 import { api, setToken } from './api.js'
@@ -131,6 +131,16 @@ describe('App navigation', () => {
 })
 
 describe('App roles', () => {
+  it('shows the agent screen to an agent', async () => {
+    localStorage.setItem('upay_token', 'saved')
+    api.me.mockResolvedValue({ user: { id: 5, name: 'Agent Babul', phone: '01811000001', role: 'agent', balance: 0 } })
+    api.agentForecast.mockResolvedValue({ status: 'green', area: 'Chawkbazar', cash_now: 1, need_cash_24h: 1, refill_cash: 0, refill_float: 0, runout_label: null, briefing_en: 'ok', briefing_bn: 'ঠিক', hours: [], p50_out: [0], p90_out: [0], p50_in: [0], p90_in: [0], cash_path_plan: [0] })
+    api.agentRefillRequests.mockResolvedValue({ requests: [] })
+    render(<App />)
+    expect(await screen.findByText(t('statusGreen'))).toBeInTheDocument()
+    expect(screen.queryByTestId('balance')).not.toBeInTheDocument()
+  })
+
   it('shows the analyst console to an analyst, not the customer home', async () => {
     localStorage.setItem('upay_token', 'saved')
     api.me.mockResolvedValue({ user: { id: 9, name: 'Nadia Rahman', phone: '01911000001', role: 'analyst', balance: 0 } })

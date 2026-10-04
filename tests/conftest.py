@@ -6,7 +6,7 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))          # so that "deploy.app" can be imported
-for sub in ("wallet-api", "simulator", "shield-api", "shield-api/transfer_risk"):
+for sub in ("wallet-api", "simulator", "shield-api", "shield-api/transfer_risk", "shield-api/liquidity"):
     sys.path.insert(0, str(ROOT / sub))
 
 # Settings a developer may have switched on in their own terminal (for running the real servers).
