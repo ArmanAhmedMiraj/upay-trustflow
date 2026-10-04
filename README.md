@@ -1,4 +1,4 @@
-# upay-trustflow: upay Shield
+# Upay Shield: AI Fraud Protection and Agent Cash Forecasting for Mobile Money
 
 **Stopping people from being talked into sending money to scammers, at the moment they press Send.**
 
