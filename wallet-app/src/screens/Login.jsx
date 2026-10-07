@@ -40,7 +40,7 @@ export default function Login({ t, lang, onToggleLang, onLoggedIn, notice }) {
 
   return (
     <div className="screen login">
-      <button className="lang" onClick={onToggleLang} aria-label="Change language">{t('language')}</button>
+      <button className="lang" onClick={onToggleLang} aria-label={`${t('language')} (change language)`}>{t('language')}</button>
       <div className="brand">
         <div className="logo" aria-hidden="true">u</div>
         <h1>{t('appName')}</h1>

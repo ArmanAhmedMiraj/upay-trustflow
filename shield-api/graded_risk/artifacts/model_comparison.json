@@ -1,0 +1,58 @@
+{
+  "data": {
+    "train": 120000,
+    "test": 40000,
+    "scams_in_test": 2000,
+    "signals": 31
+  },
+  "models": {
+    "Logistic regression (scaled)": {
+      "pr_auc": 0.668,
+      "roc_auc": 0.931,
+      "caught_at_hold_tier": 0.349,
+      "fit_seconds": 0.6,
+      "note": "Linear: easy to read, but cannot learn that signals strengthen each other",
+      "distinct_scam_scores": 101
+    },
+    "Random forest": {
+      "pr_auc": 0.724,
+      "roc_auc": 0.948,
+      "caught_at_hold_tier": 0.412,
+      "fit_seconds": 37.3,
+      "note": "Trees, but no way to forbid a signal from pushing the wrong way",
+      "distinct_scam_scores": 86
+    },
+    "Neural network (small MLP)": {
+      "pr_auc": 0.777,
+      "roc_auc": 0.958,
+      "caught_at_hold_tier": 0.501,
+      "fit_seconds": 16.5,
+      "note": "Flexible, but a black box: no clean per-signal explanation",
+      "distinct_scam_scores": 101
+    },
+    "Gradient boosting (scikit-learn)": {
+      "pr_auc": 0.82,
+      "roc_auc": 0.965,
+      "caught_at_hold_tier": 0.57,
+      "fit_seconds": 5.6,
+      "note": "Same family as LightGBM, without monotone limits here",
+      "distinct_scam_scores": 101
+    },
+    "LightGBM, no direction limits": {
+      "pr_auc": 0.81,
+      "roc_auc": 0.96,
+      "caught_at_hold_tier": 0.558,
+      "fit_seconds": 5.2,
+      "note": "Boosted trees, free to push any signal either way",
+      "distinct_scam_scores": 101
+    },
+    "LightGBM + direction limits (ours)": {
+      "pr_auc": 0.796,
+      "roc_auc": 0.956,
+      "caught_at_hold_tier": 0.542,
+      "fit_seconds": 4.3,
+      "note": "Boosted trees where each signal may only push its logical way; exact per-signal points (TreeSHAP)",
+      "distinct_scam_scores": 101
+    }
+  }
+}

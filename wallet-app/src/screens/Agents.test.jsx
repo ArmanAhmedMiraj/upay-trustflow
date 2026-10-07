@@ -107,7 +107,7 @@ describe('Agent phone screen', () => {
   it('logs out and changes language', async () => {
     const { u, onLogout, onToggleLang } = home()
     await u.click(await screen.findByRole('button', { name: t('logout') }))
-    await u.click(screen.getByRole('button', { name: 'Change language' }))
+    await u.click(screen.getByRole('button', { name: /change language/ }))
     expect(onLogout).toHaveBeenCalled(); expect(onToggleLang).toHaveBeenCalled()
   })
 })

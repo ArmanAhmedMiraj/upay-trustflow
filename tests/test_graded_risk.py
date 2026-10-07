@@ -153,3 +153,12 @@ def test_the_old_account_based_routes_are_gone(client):
 def test_catalogue_and_report_endpoints(client):
     assert len(client.get("/risk/graded/catalogue").json()["signals"]) == 31
     assert "which_sides_are_needed" in client.get("/risk/graded/report").json()
+
+
+def test_model_comparison_supports_what_the_readme_claims():
+    """README: linear is clearly behind, and our direction-limited LightGBM gives up little against the best model."""
+    m = json.loads((ART / "model_comparison.json").read_text())["models"]
+    ours = m["LightGBM + direction limits (ours)"]["pr_auc"]
+    assert len(m) == 6
+    assert ours - m["Logistic regression (scaled)"]["pr_auc"] > 0.10
+    assert max(v["pr_auc"] for v in m.values()) - ours < 0.05

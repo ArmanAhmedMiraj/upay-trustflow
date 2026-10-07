@@ -200,7 +200,7 @@ describe('Home screen', () => {
   it('logs out and switches language', async () => {
     const { user, onLogout, onToggleLang } = setup()
     await user.click(screen.getByRole('button', { name: t('logout') }))
-    await user.click(screen.getByRole('button', { name: 'Change language' }))
+    await user.click(screen.getByRole('button', { name: /change language/ }))
     expect(onLogout).toHaveBeenCalledTimes(1)
     expect(onToggleLang).toHaveBeenCalledTimes(1)
   })

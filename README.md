@@ -265,7 +265,7 @@ tests/             backend tests
 - A fraudster using an old, quiet account and acting calmly defeats the model (fraud caught falls to about 25%). Combine with
   account-level controls.
 - The scam-type guess is only about 54% accurate, so general advice is used until a transfer is held.
-- LightGBM performs about the same as logistic regression on this synthetic data; the large gain is over simple rules.
+- On the first model's 23 signals LightGBM performs about the same as logistic regression on this synthetic data; the large gain is over simple rules. On the graded model's 31 signals, where sender, recipient and link signals strengthen each other, logistic regression falls clearly behind (see "Why LightGBM" below).
 - SMS reading and the "on a call" flag are simulated; a production app would read them on the phone.
 - The optional LLM wording path has been tested against its guards but not against the live service.
 - **Module 2 limits:** the agents, their demand and the Eid and payday patterns are all simulated. The model saw only one festival
@@ -288,13 +288,46 @@ Work done during the final, in response to the Phase 1 judge feedback. All numbe
 - One caller at a time: median 6.2 ms per score over HTTP (p95 11.8 ms, p99 14.5 ms), about 126 scores per second.
 - 50 callers at once: about 135 scores per second, 0 failures out of 1,000. One Shield process on one laptop reaches roughly 130 scores per second; scaling beyond that means running more copies of the service, which we have not load tested.
 
-**Accessibility: automated WCAG 2.1 A/AA audit (axe-core).** We checked the login screen (0 violations), the home screen (1 colour-contrast violation, fixed, then 0) and the risk-warning screen (0 violations). We also walked the screens with the keyboard (Tab) and found that controls had no clear focus indicator; every control now shows a visible focus ring (WCAG 2.4.7). The new Risk Lab screen scans at 0 violations. This is mostly automated checking, which finds only part of the possible problems. Screen-reader testing is still to be done.
+**Accessibility: automated WCAG 2.1 A/AA audit (axe-core).** We checked the login screen (0 violations), the home screen (1 colour-contrast violation, fixed, then 0) and the risk-warning screen (0 violations). We also walked the screens with the keyboard (Tab) and found that controls had no clear focus indicator; every control now shows a visible focus ring (WCAG 2.4.7). After the Risk Lab and demo contacts were added we scanned again: the login screen, home screen, send-money screen (with and without a contact picked), the safety-check review and the Risk Lab all show 0 violations. The scan also caught that the language button's spoken name did not contain its visible text (WCAG 2.5.3); it is fixed. This is mostly automated checking, which finds only part of the possible problems. Screen-reader testing is still to be done.
 
 **Model depth: graded-risk model with sender, recipient and link signals, and an analyst Risk Lab.** We wanted the model not to lean on a few sender signals, so we researched what collector (mule) accounts look like and built a second scoring model, `shield-api/graded_risk/`, that reads 31 signals in three groups: 10 about the sender's behaviour, 15 about the recipient account (age, SIM age, KYC level, wallets per ID, shared device, new payers, cash-out speed, dormancy, reports ...) and 6 about the link between them. Every signal has a stated reason ([docs/graded_risk_research.md](docs/graded_risk_research.md)) and the model may only push each signal in its logical direction. On the live payment path **both models score every transfer and Shield keeps the more worried answer** (`shield-api/graded_risk/live.py`), so adding the graded model can only make Shield more careful, never less. Every real transfer is also recorded in the analyst **Risk Lab** (console, tab "Risk Lab") with the graded model's explanation.
 - Risk Lab: a log of **real transfers only**. Each transfer made in the app is scored the moment it happens and listed with sender, recipient, amount, risk % and outcome; nothing is pre-filled, so the list is empty until someone sends money. Analysts filter by sender number, recipient number (both dropdowns of numbers that really appear), registered name, and date/time (Bangladesh time). Opening a transfer shows the risk %, how many points each signal added or removed, the split between sender, recipient and link, a combination test (sender signals only, recipient signals only, all together), and buttons that hide a whole group so you can see what the model loses.
 - Demo contacts: the send-money screen (demo mode only) lists 10 people with their numbers, each built to reach a known level for a payment of about ৳3,000 from any of the three demo accounts (Rahim, Nusrat, Sumon): Mum, Landlord and Shahin Grocery go straight through; Tania Rahman gets a note; Rubel Electronics and Sadia Enterprise trigger the safety check; Nabil Hasan (SIM-swapped dormant account), Rina Sultana (rented-SIM collector), Jamal Hossain and Mitu Akter are held. Each contact has a stated reason, and `tests/test_demo_contacts.py` sends to every contact from every demo account to prove the stated level is the real one. The contacts' history is dated relative to the moment the demo world is built, so press **Reset demo** shortly before presenting.
 - Test on 40,000 unseen synthetic transfers: PR-AUC 0.24 with sender signals only, 0.57 with recipient signals only, 0.80 with all three groups. 54% of scams reach the hold tier while 0.27% of genuine transfers are disturbed. Only 10.6% of scams score 99% or more, so scores are graded rather than all-or-nothing. The data and its scam stories were written by us, so these numbers show the method works, not how it would perform on real traffic.
+- Speed of the live path with both models (in-process, same harness for both): median 11.8 ms against 9.4 ms for the first model alone (p95 18.8 ms), plus about 6 ms in the wallet to build the 31 signals from the ledger. Measured on one laptop with a small demo database.
 - Reproduce: `python shield-api/graded_risk/train.py` (about one minute); tests in `tests/test_graded_risk.py`, `tests/test_lab_api.py` and `tests/test_demo_contacts.py`.
+
+**Why LightGBM, and what we compared it with.** We did not pick the model by habit. For the first model we compared simple rules, logistic regression and LightGBM (section 8). For the graded model we trained six families on the same 200,000 synthetic transfers, the same train / calibration / test split and the same friction budget (0.3% of genuine transfers disturbed at the hold tier), then measured them on 40,000 transfers none of them had seen (`python shield-api/graded_risk/compare_models.py`, results in `shield-api/graded_risk/artifacts/model_comparison.json`):
+
+| Model | PR-AUC | Scams caught at the hold tier | Why it is or is not our choice |
+|---|---|---|---|
+| Logistic regression | 0.67 | 35% | Easy to read, but cannot learn that signals strengthen each other (a new SIM *and* a shared phone *and* fast cash-out). Clearly behind here. |
+| Random forest | 0.72 | 41% | Trees, but no way to stop a signal from pushing the wrong way. |
+| Small neural network | 0.78 | 50% | Flexible, but a black box: no clean "this signal added 14 points". |
+| Gradient boosting (scikit-learn) | 0.82 | 57% | Best raw score, same family as LightGBM, but no direction limits and slower to explain. |
+| LightGBM, no direction limits | 0.81 | 56% | Same family, free to push any signal either way. |
+| **LightGBM with direction limits (ours)** | **0.80** | **54%** | Each signal may only push its logical way, and TreeSHAP gives exact points per signal. |
+
+Our choice is not the highest raw score: unrestricted boosting is about 2 points of PR-AUC higher (0.81-0.82 against 0.80). We accept that cost on purpose, for three reasons. (1) **Explainability that a judge or an analyst can trust:** LightGBM's TreeSHAP gives exact points per signal, and the Risk Lab shows them, so "baseline + all signals = final risk" holds for every transfer. (2) **Direction limits:** the model is forbidden from learning that, say, a *newer* SIM makes a transfer *safer*, which synthetic noise can otherwise teach it and which would be impossible to defend. (3) **Speed and size:** it scores in a few milliseconds on a CPU and the model file is small, which matters for a payment path. Against logistic regression the gap is large (0.67 against 0.80), because the signals combine. These are single runs on synthetic data we wrote, so the ranking of close models (the top three) could change on real data; the clear findings are that linear is behind and that the explainable boosted model gives up little to get its explanations.
+
+**Judge feedback against the build today (7 October 2026).**
+
+| Area | What the judges asked | Status now |
+|---|---|---|
+| Security | Improve API authenticity | **Done.** Signed wallet-to-Shield calls (HMAC-SHA256, timestamp, replay refused). The new live-scoring and Risk Lab calls use the same signed client. |
+| Prototype | Load and latency numbers | **Done**, and re-measured for the new two-model path (above). The 130 scores/s figure was measured on the first model alone and has not been repeated for the two-model path. |
+| Prototype | Accessibility audit | **Done in part.** Automated WCAG 2.1 A/AA scan: 0 violations on all audited screens including the new ones. Screen-reader and full keyboard testing remain. |
+| Scalability | Throughput numbers | **Done** for the first model; two-model path not yet load tested. |
+| AI/ML depth | Justify LightGBM over logistic regression | **Done.** Measured comparison of six model families (table above), including the honest cost of our choice. |
+| AI/ML depth | Use both sender and recipient information | **Done.** 31-signal graded model with sender, recipient and link groups, per-signal points, combination test, and an analyst Risk Lab of real transfers. |
+| Innovation | Sharpen the novelty claim | **Done in the response pack.** The new part is a graded score that is explained signal by signal and tested for needing both sides. |
+| Business impact | Unit economics, pilot plan | **Drafted** with placeholder inputs that need upay's real numbers. |
+| Scalability | Adapters, multi-tenant design | **Drafted as a note**, not built. |
+| Problem relevance | National loss figures, competitor slide | **Open:** needs sourced numbers. |
+| Business impact | Letter of intent from upay | **Not possible from our side.** |
+| AI/ML depth | Real data, sequence model, better scam-type guess | **Not done.** Next steps; all data here is synthetic. |
+| Scalability | Offline agent mode, monitoring, production infrastructure | **Not done.** Next steps. |
+| Responsible AI | Quiet-account evasion | **Documented limit.** Quiet, unreported collector accounts remain the weakest case. |
 
 **Honest notes.**
 - All data is synthetic. Validation on real upay data is the first step of any pilot.

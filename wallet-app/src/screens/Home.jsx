@@ -67,7 +67,7 @@ export default function Home({ user, setUser, t, lang, onToggleLang, onLogout, g
           <small className="my-number">{formatPhone(user.phone)}</small>
         </div>
         <div className="topbar-actions">
-          <button className="lang" onClick={onToggleLang} aria-label="Change language">{t('language')}</button>
+          <button className="lang" onClick={onToggleLang} aria-label={`${t('language')} (change language)`}>{t('language')}</button>
           <button className="lang" onClick={onLogout}>{t('logout')}</button>
         </div>
       </header>

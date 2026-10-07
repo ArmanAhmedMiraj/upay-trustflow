@@ -53,7 +53,7 @@ export default function AgentHome({ user, t, lang, onToggleLang, onLogout }) {
       <header className="topbar">
         <div><small>{t('hello')},</small><strong>{user.name}</strong></div>
         <div className="topbar-actions">
-          <button className="lang" onClick={onToggleLang} aria-label="Change language">{t('language')}</button>
+          <button className="lang" onClick={onToggleLang} aria-label={`${t('language')} (change language)`}>{t('language')}</button>
           <button className="lang" onClick={onLogout}>{t('logout')}</button>
         </div>
       </header>

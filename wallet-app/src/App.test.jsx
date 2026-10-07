@@ -89,7 +89,7 @@ describe('App', () => {
   it('remembers the chosen language', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<App />)
-    await user.click(screen.getByRole('button', { name: 'Change language' }))
+    await user.click(screen.getByRole('button', { name: /change language/ }))
     await waitFor(() => expect(localStorage.getItem('upay_lang')).toBe('bn'))
     expect(document.documentElement.lang).toBe('bn')
     unmount()
