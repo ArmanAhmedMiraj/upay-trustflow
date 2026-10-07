@@ -124,24 +124,30 @@ def client():
         yield c
 
 
-def test_accounts_endpoint_lists_demo_people_and_stories(client):
-    body = client.get("/risk/graded/accounts").json()
-    assert len(body["senders"]) >= 5 and len(body["recipients"]) >= 12 and len(body["scenarios"]) >= 10
-    ids = {r["id"] for r in body["recipients"]}
-    assert all(s["recipient"] in ids for s in body["scenarios"])
+def _typical():
+    return {n: cat.TYPICAL[n] for n in cat.FEATURE_NAMES}
 
 
-def test_score_endpoint_returns_sides_and_a_contribution_for_every_signal(client):
-    out = client.post("/risk/graded", json={"sender_id": "karim", "recipient_id": "mule_officer",
-                                            "tx": {"amount": 45000, "hour": 15, "on_call": 1}}).json()
+def test_score_features_returns_sides_and_a_contribution_for_every_signal(client):
+    f = _typical() | {"r_report_count": 3, "r_age_days": 2, "r_sim_age_days": 5, "r_kyc_level": 0, "r_first_time_senders_24h": 10,
+                         "r_outflow_ratio_24h": 0.95, "i_first_time_recipient": 1}
+    out = client.post("/risk/graded/score-features", json={"features": f}).json()
     assert len(out["contributions"]) == 31 and set(out["sides"]) == {"sender", "recipient", "pair"}
-    assert out["recipient"]["id"] == "mule_officer" and out["model_version"] == "graded-1"
+    assert out["model_version"] == "graded-1" and out["risk_pct"] > client.post(
+        "/risk/graded/score-features", json={"features": _typical()}).json()["risk_pct"]
 
 
-def test_score_endpoint_rejects_bad_input(client):
-    assert client.post("/risk/graded", json={"sender_id": "nobody", "recipient_id": "mother"}).status_code == 404
-    assert client.post("/risk/graded", json={"sender_id": "rahim", "recipient_id": "mother", "tx": {"amount": -5}}).status_code == 422
-    assert client.post("/risk/graded", json={"sender_id": "rahim", "recipient_id": "mother", "mute_sides": ["bank"]}).status_code == 422
+def test_score_features_rejects_bad_input(client):
+    post = lambda **kw: client.post("/risk/graded/score-features", json=kw).status_code   # noqa: E731
+    assert post(features={"s_on_call": 1}) == 422                                  # not all 31 signals
+    assert post(features=_typical() | {"made_up": 1}) == 422                        # an unknown signal
+    assert post(features=_typical(), mute_sides=["bank"]) == 422                    # an unknown side
+    assert post(features=_typical() | {"s_on_call": 1e12}) == 422                   # absurd number
+
+
+def test_the_old_account_based_routes_are_gone(client):
+    assert client.get("/risk/graded/accounts").status_code == 404
+    assert client.post("/risk/graded", json={}).status_code == 404
 
 
 def test_catalogue_and_report_endpoints(client):

@@ -138,3 +138,39 @@ class RefillRequest(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     dispatched_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+
+class AccountProfile(Base):
+    """What upay knows about an account beyond its ledger: identity checks, SIM and phone details, district, contact circles.
+
+    Accounts without a profile are treated as ordinary (full KYC, unremarkable SIM, no shared device)."""
+
+    __tablename__ = "account_profiles"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    district: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    sim_age_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    kyc_level: Mapped[int] = mapped_column(Integer, default=2)               # 0 minimal, 1 basic, 2 full
+    wallets_per_nid: Mapped[int] = mapped_column(Integer, default=1)         # wallets registered under the same national ID
+    shared_device_wallets: Mapped[int] = mapped_column(Integer, default=0)   # other wallets used on the same phone
+    sim_swap_recent: Mapped[bool] = mapped_column(Boolean, default=False)
+    circles_json: Mapped[str] = mapped_column(Text, default="[]")            # contact-book groups, used for "contacts in common"
+    blurb: Mapped[str | None] = mapped_column(String(200), nullable=True)    # one line shown on the demo login screen
+    demo_group: Mapped[str | None] = mapped_column(String(20), nullable=True)  # sender or recipient, for the demo login screen
+
+
+class LabEntry(Base):
+    """One real transfer, scored by the graded-risk model at the moment it happened. The Risk Lab lists only these."""
+
+    __tablename__ = "lab_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    transaction_id: Mapped[int] = mapped_column(ForeignKey("transactions.id"), unique=True, index=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    amount: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20))                          # completed or held at the time
+    created_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    features_json: Mapped[str] = mapped_column(Text)                         # the 31 signals, exactly as the model saw them
+    risk_pct: Mapped[float | None] = mapped_column(nullable=True)            # empty if Shield was off at that moment
+    tier: Mapped[str | None] = mapped_column(String(20), nullable=True)

@@ -70,18 +70,24 @@ def _checked(result: dict | None, keys: set) -> dict | None:
     return result
 
 
-def assess(features: dict) -> dict | None:
-    """Ask Shield to score a transfer. Returns None when Shield is unavailable for any reason."""
+def assess(features: dict, graded: dict | None = None) -> dict | None:
+    """Ask Shield to score a transfer. Returns None when Shield is unavailable for any reason.
+
+    With `graded` (the 31 signals of the graded model) Shield scores with both models and keeps the more worried one."""
     try:
+        if graded is not None:
+            return _checked(_post("/risk/score-live", {"features": features, "graded_features": graded}), SCORE_KEYS)
         return _checked(_post("/risk/score", features), SCORE_KEYS)
     except Exception as exc:   # network error, timeout, bad reply: never let it break a payment
         log.warning("Shield unavailable, allowing the transfer: %s", exc)
         return None
 
 
-def refine(features: dict, answers: list[dict]) -> dict | None:
+def refine(features: dict, answers: list[dict], graded: dict | None = None) -> dict | None:
     """Ask Shield to re-score a transfer using the customer's safety-check answers (None if unavailable)."""
     try:
+        if graded is not None:
+            return _checked(_post("/risk/refine-live", {"features": features, "graded_features": graded, "answers": answers}), REFINE_KEYS)
         return _checked(_post("/risk/refine", {"features": features, "answers": answers}), REFINE_KEYS)
     except Exception as exc:
         log.warning("Shield refine unavailable: %s", exc)

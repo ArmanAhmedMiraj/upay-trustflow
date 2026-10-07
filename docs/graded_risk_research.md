@@ -80,7 +80,7 @@ signal can never behave in a way we cannot explain to a judge. 31 signals: 10 se
 1. All 31 signals go into one gradient-boosted model (LightGBM, small trees, strong regularisation, monotone limits).
 2. The model's raw output is mapped to a probability with a one-step calibration, so that "60%" means roughly 60 in 100 on the test data.
 3. Each signal's contribution comes from the model itself (TreeSHAP) and is converted to percentage points, so
-   **baseline + all signals = final risk**. The Risk Lab shows these points, grouped by sender, recipient and link.
+   **baseline + all signals = final risk**. The Risk Lab shows these points for every real transfer, grouped by sender, recipient and link.
 4. The score is shown between 0.1% and 99.9%. The model never claims certainty.
 5. Tiers: note at 9.8%, safety check at 27.8%, hold at 61.9%. Each threshold was chosen so that
    it disturbs no more than a stated share of genuine transfers (note 5%, high 1.5%, very_high 0.3%).
@@ -107,5 +107,10 @@ Test set: 40,000 transfers the model never saw, 2,000 of them scams (a 5% scam r
   a rented old account, a clean-looking recipient, faint signals) and the honest hard cases (busy shop, new honest wallet, real
   emergency) are our own assumptions. The test numbers show the method works on this data; they are not a forecast for real upay traffic.
 - The scam rate in the data is 5%. Real rates are far lower, so the percentages describe this mix, and a real deployment must be recalibrated on real data.
-- The demo accounts in the Risk Lab are invented. Seed values were tuned so the demo covers easy, hard and in-between cases, and some of them (for example the unclear account) sit near a tier boundary on purpose.
+- The demo contacts in the send-money screen are invented, and the Risk Lab lists only transfers actually made through the app. Seed values were tuned so the demo covers easy, hard and in-between cases, and some of them (for example the unclear account) sit near a tier boundary on purpose.
 - The first step of any pilot is to replace the synthetic data with real, labelled upay history and to measure the same tests again.
+
+## How the graded model joins the live payment path
+- The wallet builds both signal sets for the transfer (23 for the first model, 31 for this one) from its own records. Account details that are not in the ledger (SIM age, ID level, wallets under one ID, shared device, district, contact circles) come from an account profile table; an account with no profile is treated as ordinary.
+- Shield scores with both and keeps the more worried result (higher tier; on a tie, the higher percentage), so the new model can only add caution. Safety-check answers are then applied to whichever model made the decision, with the same capped steps as before.
+- A limit worth saying out loud: profile data such as SIM age and ID level is what lets the graded model see rented-SIM collector accounts that the first model cannot. In production those would come from upay's own systems; here they are invented.

@@ -16,6 +16,7 @@ Everything is invented. All accounts use PIN 12345 except the analyst (99999).
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import pathlib
 import random
@@ -31,7 +32,8 @@ for sub in ("wallet-api", "simulator"):
 import generate_transfers as sim  # noqa: E402
 import security  # noqa: E402
 from database import Base  # noqa: E402
-from models import Report, SmsMessage, Transaction, User, utcnow  # noqa: E402
+import demo_contacts  # noqa: E402
+from models import AccountProfile, Report, SmsMessage, Transaction, User, utcnow  # noqa: E402
 
 DHAKA = timedelta(hours=6)
 DEFAULT_PIN, ANALYST_PIN = "12345", "99999"
@@ -127,7 +129,21 @@ def seed(db, n_users: int = 1500, days: int = 60, seed_value: int = 42, now: dat
                      failed_pin_attempts=0, created_at=now - timedelta(days=60)))
     rows.append(dict(id=fraud2_w, phone=DEMO["fraudster2"], name="Mitu Akter", pin_hash=shared_hash, role="customer", balance=0,
                      failed_pin_attempts=0, created_at=now - timedelta(days=2)))
+    # the demo contacts a demo customer can pick when sending money (own random stream: the rest of the world is unchanged)
+    contact_pool = [uid(w) for w in range(n_users) if w not in renamed]
+    contacts = demo_contacts.build(now, random.Random(seed_value + 1001), contact_pool, agent_ids, scenario_id + 3,
+                                    existing={"fashion_hub": seller_w})
+    rows.extend(contacts["users"])
+    for u in contacts["users"]:
+        u["pin_hash"] = shared_hash
     db.bulk_insert_mappings(User, rows)
+    key_to_id = {k: uid(w) for w, (_, k) in renamed.items()}
+    key_to_id.update({"fraudster": fraud_w, "fraudster2": fraud2_w, "fashion_hub": seller_w, **contacts["ids"]})
+    db.bulk_insert_mappings(AccountProfile, [
+        dict(user_id=key_to_id[k], district=v["district"], sim_age_days=v["sim_age_days"], kyc_level=v["kyc_level"],
+             wallets_per_nid=v["wallets_per_nid"], shared_device_wallets=v["shared_device_wallets"],
+             sim_swap_recent=bool(v.get("sim_swap_recent", False)), circles_json=json.dumps(v["circles"]),
+             blurb=demo_contacts.BLURB.get(k), demo_group=None) for k, v in demo_contacts.PROFILES.items() if k in key_to_id])
     db.commit()
 
     # ---------------------------------------------------------------- events, then one chronological replay
@@ -166,6 +182,7 @@ def seed(db, n_users: int = 1500, days: int = 60, seed_value: int = 42, now: dat
     for k, payer in enumerate(rng.sample(customers, 2)):
         events.append((now - timedelta(days=30 + k), "send_money", payer, seller_w, 2000))
 
+    events.extend(contacts["events"])
     events = [e for e in events if e[0] < now - timedelta(seconds=30)]
     events.sort(key=lambda e: e[0])
 

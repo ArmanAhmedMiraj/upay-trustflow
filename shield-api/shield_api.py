@@ -27,6 +27,7 @@ import safety_check  # noqa: E402
 import request_auth  # noqa: E402
 import scorer  # noqa: E402
 from graded_risk import api as graded_api  # noqa: E402
+from graded_risk import live as graded_live  # noqa: E402
 from features import FEATURES  # noqa: E402
 
 
@@ -178,6 +179,53 @@ def risk_score(body: TransferFeatures, request: Request):
     result["questions"] = safety_check.questions_for(result["scam_type"]) if result["action"] == "safety_check" else []
     _attach_message(result, result["tier"], request)
     result["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+    return result
+
+
+class LiveRequest(BaseModel):
+    """A real transfer, described twice: the first model's 23 signals and the graded model's 31."""
+    features: TransferFeatures
+    graded_features: dict[str, float]
+
+
+class LiveRefineRequest(LiveRequest):
+    answers: list[Answer]
+
+
+def _live_first(body: LiveRequest, art) -> dict:
+    v1 = body.features.model_dump()
+    try:
+        return graded_live.combine(scorer.score_transfer(v1, art), body.graded_features, v1, art)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.post("/risk/score-live", response_model=RiskResponse)
+def risk_score_live(body: LiveRequest, request: Request):
+    """Score a real transfer with both models and keep the more worried answer (see graded_risk/live.py)."""
+    art = _artifacts(request)
+    t0 = time.perf_counter()
+    result = _live_first(body, art)
+    result["questions"] = safety_check.questions_for(result["scam_type"]) if result["action"] == "safety_check" else []
+    _attach_message(result, result["tier"], request)
+    result["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+    return result
+
+
+@app.post("/risk/refine-live", response_model=RefineResponse)
+def risk_refine_live(body: LiveRefineRequest, request: Request):
+    """Safety-check answers applied to whichever model made the decision."""
+    art = _artifacts(request)
+    first = _live_first(body, art)
+    answers = {a.question_id: a.answer for a in body.answers}
+    try:
+        if first["model_version"] == graded_live.MODEL_VERSION:
+            result = graded_live.refine(first, body.graded_features, answers, safety_check)
+        else:
+            result = safety_check.refine(body.features.model_dump(), answers, art)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    _attach_message(result, result["tier_after"], request)
     return result
 
 

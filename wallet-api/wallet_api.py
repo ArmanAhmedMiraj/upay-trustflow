@@ -8,6 +8,7 @@ Then open http://localhost:8000/docs to try it in the browser.
 """
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import sys
@@ -19,8 +20,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import impact as impact_metrics
+import lab
 import shield_client
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "shield-api" / "liquidity"))   # Module 2 (agent cash forecasting)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "simulator"))   # the demo contacts (send-money screen helper)
 import wallet_service as svc
 import database
 from database import get_db
@@ -209,10 +212,7 @@ def analyst_model_report(user: User = Depends(analyst_user)):
 
 
 # ------------------------------------------------------------------ Risk Lab (analysts): how the model reached a score
-class LabIn(BaseModel):
-    sender_id: str
-    recipient_id: str
-    tx: dict = Field(default_factory=dict)
+class LabExplainIn(BaseModel):
     mute_sides: list[str] = Field(default_factory=list)
     mute_signals: list[str] = Field(default_factory=list)
 
@@ -222,11 +222,6 @@ def _lab(method: str, path: str, payload: dict | None = None) -> dict:
         return shield_client.lab_call(method, path, payload)
     except Exception as exc:   # Shield off, down or slow: say so plainly; no money is involved here
         raise svc.WalletError("shield_unavailable", f"The Risk Lab needs Shield, which is not reachable ({type(exc).__name__})", 503)
-
-
-@app.get("/lab/accounts")
-def lab_accounts(user: User = Depends(analyst_user)):
-    return _lab("GET", "/risk/graded/accounts")
 
 
 @app.get("/lab/catalogue")
@@ -239,9 +234,34 @@ def lab_report(user: User = Depends(analyst_user)):
     return _lab("GET", "/risk/graded/report")
 
 
-@app.post("/lab/score")
-def lab_score(body: LabIn, user: User = Depends(analyst_user)):
-    return _lab("POST", "/risk/graded", body.model_dump())
+@app.get("/lab/filters")
+def lab_filters(user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    """The sender numbers, recipient numbers and names that really appear in recorded transfers."""
+    return lab.filter_options(db)
+
+
+@app.get("/lab/transactions")
+def lab_transactions(sender: str | None = None, recipient: str | None = None, name: str | None = None,
+                     since: str | None = None, until: str | None = None, limit: int = 100,
+                     user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    """Real transfers only, newest first. `since` / `until` are Bangladesh time, like 2026-10-07T14:30."""
+    try:
+        entries = lab.list_entries(db, sender, recipient, name, since, until, limit)
+    except ValueError:
+        raise svc.WalletError("invalid_time", "Dates must look like 2026-10-07 or 2026-10-07T14:30", 422)
+    return {"entries": entries, "total_recorded": lab.filter_options(db)["total"]}
+
+
+@app.post("/lab/transactions/{entry_id}/explain")
+def lab_explain(entry_id: int, body: LabExplainIn, user: User = Depends(analyst_user), db: Session = Depends(get_db)):
+    """How the model reached the score for one recorded transfer, signal by signal (optionally with a side hidden)."""
+    found = lab.get_entry(db, entry_id)
+    if found is None:
+        raise svc.WalletError("not_found", "No such recorded transfer", 404)
+    entry, sender, recipient = found
+    out = _lab("POST", "/risk/graded/score-features", {"features": json.loads(entry.features_json),
+                                                      "mute_sides": body.mute_sides, "mute_signals": body.mute_signals})
+    return {**out, "entry": lab.entry_out(entry, sender, recipient)}
 
 
 # ------------------------------------------------------------------ Module 2: agent cash forecasting
@@ -392,6 +412,15 @@ def demo_release_holds(user: User = Depends(current_user), db: Session = Depends
     if not DEMO_MODE:
         raise svc.WalletError("demo_disabled", "Demo tools are switched off", 404)
     return {"released": svc.release_holds_now(db, user)}
+
+
+@app.get("/demo/contacts")
+def demo_contacts_list(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """DEMO ONLY: people the demo customer can pick in the send screen, each with the level it triggers and why."""
+    if not DEMO_MODE:
+        raise svc.WalletError("demo_disabled", "Demo tools are switched off", 404)
+    import demo_contacts
+    return {"contacts": [c for c in demo_contacts.contact_list(db, User) if c["phone"] != user.phone]}
 
 
 @app.post("/demo/reset")

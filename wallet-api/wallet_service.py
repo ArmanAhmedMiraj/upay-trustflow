@@ -19,6 +19,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+import lab
 import risk_hook
 import security
 from models import AuthSession, Report, RiskEvent, SmsMessage, Transaction, User, utcnow
@@ -347,6 +348,7 @@ def send_money(db: Session, sender: User, recipient_phone: str, amount: int, pin
         if event and event.transaction_id is None:
             event.transaction_id = txn.id
             db.commit()
+    lab.record(db, sender, recipient, txn, behavior)   # the Risk Lab keeps every real transfer; it can never change this payment
     return txn
 
 

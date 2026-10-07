@@ -11,6 +11,7 @@ Every assessment is saved in the risk_events table for the analyst console and t
 import json
 from dataclasses import dataclass, field
 
+import lab_features
 import risk_features
 import shield_client
 from models import RiskEvent
@@ -53,14 +54,18 @@ def _from_refine(r: dict) -> RiskDecision:
 def check_transfer(db, sender, recipient, amount: int, behavior: dict | None = None, source: str = "send",
                    answers: list[dict] | None = None) -> RiskDecision:
     features = risk_features.build_live_features(db, sender, recipient, amount, behavior)
+    try:    # the graded model's 31 signals; if they cannot be built the first model decides alone, as before
+        graded = lab_features.build_graded_features(db, sender, recipient, amount, behavior, v1=features)
+    except Exception:
+        graded = None
     decision = None
     if answers:
-        refined = shield_client.refine(features, answers)
+        refined = shield_client.refine(features, answers, graded)
         if refined is not None:
             decision = _from_refine(refined)
             source = "refine" if source == "preview" else source
     if decision is None:
-        scored = shield_client.assess(features)
+        scored = shield_client.assess(features, graded)
         decision = _from_score(scored) if scored is not None else RiskDecision()
     event = RiskEvent(sender_id=sender.id, recipient_id=recipient.id, amount=amount, risk_pct=decision.risk_pct,
                       tier=decision.tier, action=decision.action, scam_type=decision.scam_type,
