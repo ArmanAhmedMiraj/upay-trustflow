@@ -175,6 +175,11 @@ npm run dev                                            # http://localhost:5173
    *Festival rush* and watch the map turn from green to red. Click an agent to see the forecast, the run-out time and the message.
 7. Log in as **Agent Babul** on a phone-sized window. He sees that his cash will run short, when, and how much to add, in English or
    Bangla. Tap **Ask upay to bring cash**; in the console the request appears under *Refill requests* and you can **Dispatch** it.
+   Under the demo buttons, the **calendar** lets you tap any day (paydays and festival rushes are marked) to see the forecast for it.
+   In the analyst Agents tab the **map zooms and pans** (buttons, wheel, drag) and each area shows an estimated number of nearby users.
+8. **Pick a contact (demo mode):** log in as Rahim, Nusrat or Sumon, open **Send Money** and choose one of the ten demo contacts.
+   Each shows its number, level and reason (goes through, note, safety check, or held 30 minutes). Then open the analyst **Risk Lab**
+   to see that real transfer, filter it by number, name or time, and open it to see how many points each signal added.
 
 | Demo character | Phone | Role |
 |---|---|---|
@@ -182,6 +187,14 @@ npm run dev                                            # http://localhost:5173
 | Rahima Begum (Mum) | 01711000002 | Everyday payments |
 | Nusrat Jahan | 01711000005 | Another customer (use it for the safety-check questions) |
 | Fashion Hub BD | 01711000007 | A young online seller |
+| Tania Rahman | 01713894502 | Goes through with a note |
+| Rubel Electronics | 01715620817 | Safety check |
+| Sadia Enterprise | 01816209345 | Safety check |
+| Nabil Hasan | 01911527063 | Held 30 minutes (taken-over account) |
+| Rina Sultana | 01613308841 | Held 30 minutes (new collector wallet) |
+| Karim Mia (Landlord) | 01711000003 | Goes through |
+| Shahin Grocery | 01711000004 | Goes through |
+| Sumon Mia | 01711000006 | Third demo customer |
 | Jamal Hossain | 01711999999 | Fraud wallet 1 (already reported twice) |
 | Mitu Akter | 01711999998 | Fraud wallet 2 (not yet reported) |
 | Agent Babul | 01811000001 | Agent cash forecast (PIN 12345) |
@@ -195,9 +208,9 @@ question tier at this moment (it depends on the time of day).
 ## 7. Testing
 
 ```
-python -m pytest -q                    # backend, both models, deployment: 278 tests
+python -m pytest -q                    # backend, both models, Risk Lab, deployment: 325 tests
 cd wallet-app
-npm test                               # phone app and console: 134 tests
+npm test                               # phone app and console: 155 tests
 ```
 What the tests prove: features never use the future (a test rebuilds features from truncated history and we checked it catches a
 deliberate leak); the live feature builder matches the training builder on a whole simulated world; no single signal can raise an
