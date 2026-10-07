@@ -7,8 +7,12 @@ AI helper is unavailable would do more harm than the fraud it might catch.
 Shield is switched on by setting the environment variable SHIELD_API_URL, for example
     $env:SHIELD_API_URL = "http://localhost:8001"
 """
+import hashlib
+import hmac
+import json
 import logging
 import os
+import time
 
 import httpx
 
@@ -21,7 +25,14 @@ def _post(path: str, payload: dict) -> dict | None:
     if not url:
         return None
     timeout = float(os.getenv("SHIELD_TIMEOUT_SECONDS", "2.0"))
-    response = httpx.post(url + path, json=payload, timeout=timeout)
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    headers = {"Content-Type": "application/json"}
+    secret = os.getenv("SHIELD_API_SECRET", "").strip()
+    if secret:   # prove to Shield that this call comes from the wallet and was not changed on the way
+        stamp = str(int(time.time()))
+        headers["X-Shield-Timestamp"] = stamp
+        headers["X-Shield-Signature"] = hmac.new(secret.encode(), stamp.encode() + b"." + body, hashlib.sha256).hexdigest()
+    response = httpx.post(url + path, content=body, headers=headers, timeout=timeout)
     response.raise_for_status()
     return response.json()
 

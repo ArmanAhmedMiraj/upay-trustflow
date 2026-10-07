@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "transfer_risk"))
 import messages  # noqa: E402
 import safety_check  # noqa: E402
+import request_auth  # noqa: E402
 import scorer  # noqa: E402
 from features import FEATURES  # noqa: E402
 
@@ -42,6 +43,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="upay Shield API", version="1.0", lifespan=lifespan,
               description="Scores a transfer before the customer confirms it. Advice only: it never blocks money.")
+
+
+# only the wallet may ask for a score: calls must be signed when SHIELD_API_SECRET is set (see request_auth.py)
+app.add_middleware(request_auth.SignedRequests)
 
 
 class TransferFeatures(BaseModel):
