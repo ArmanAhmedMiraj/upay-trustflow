@@ -11,9 +11,11 @@ vi.mock('../api.js', async (importOriginal) => {
   const real = await importOriginal()
   return { ...real, api: {
     agentForecast: vi.fn(), agentRefillRequest: vi.fn(), agentRefillRequests: vi.fn(),
-    opsAgents: vi.fn(), opsAgent: vi.fn(), opsCoverage: vi.fn(), opsLiquidityReport: vi.fn(), opsRefillRequests: vi.fn(), dispatchRefill: vi.fn() } }
+    agentCalendar: vi.fn(), opsCalendar: vi.fn(), opsAgents: vi.fn(), opsAgent: vi.fn(), opsCoverage: vi.fn(), opsLiquidityReport: vi.fn(), opsRefillRequests: vi.fn(), dispatchRefill: vi.fn() } }
 })
 import { api } from '../api.js'
+import AgentMap from '../components/AgentMap.jsx'
+import DayStrip from '../components/DayStrip.jsx'
 
 const t = makeT('en')
 const hours = Array.from({ length: 48 }, (_, i) => (8 + i) % 24)
@@ -27,6 +29,13 @@ const RED = {
   cash_path_plan: hours.map((_, i) => 31612 - i * 4000), float_path_plan: hours.map((_, i) => 90000 - i * 800),
 }
 const GREEN = { ...RED, status: 'green', refill_cash: 0, runout_label: null, runout_hours_from_now: null, briefing_en: 'You have enough cash for the next 24 hours.', briefing_bn: 'আগামী ২৪ ঘণ্টার জন্য আপনার নগদ যথেষ্ট।' }
+const DAYS = [
+  { day: 29, weekday: 'Mon', day_of_month: 30, payday: true, festival_rush: false, scenario: null },
+  { day: 30, weekday: 'Tue', day_of_month: 1, payday: true, festival_rush: false, scenario: null },
+  { day: 44, weekday: 'Tue', day_of_month: 15, payday: false, festival_rush: true, scenario: null },
+  { day: 74, weekday: 'Fri', day_of_month: 15, payday: false, festival_rush: true, scenario: 'festival' },
+  { day: 82, weekday: 'Sat', day_of_month: 23, payday: false, festival_rush: false, scenario: 'normal' },
+]
 const user = { id: 5, name: 'Agent Babul', role: 'agent', phone: '01811000001', balance: 0 }
 
 function home(props = {}) {
@@ -39,6 +48,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.agentForecast.mockResolvedValue(RED)
   api.agentRefillRequests.mockResolvedValue({ requests: [] })
+  api.agentCalendar.mockResolvedValue({ days: DAYS })
+  api.opsCalendar.mockResolvedValue({ days: DAYS })
 })
 
 describe('Agent phone screen', () => {
@@ -226,5 +237,60 @@ describe('Forecast chart', () => {
   it('has no red zone when the agent has enough cash', () => {
     const { container } = render(<ForecastChart data={{ ...GREEN, cash_path_plan: hours.map(() => 50000) }} labels={{ demand: 'D', normal: 'N', busy: 'B', cash: 'C' }} />)
     expect(container.querySelector('rect.below-zero')).toBeNull()
+  })
+})
+
+
+describe('Calendar and zoomable map', () => {
+  it('marks paydays and festival rushes on the calendar and reports the picked day', async () => {
+    const onPick = vi.fn()
+    const u = userEvent.setup()
+    render(<DayStrip days={DAYS} selected={74} onPick={onPick} />)
+    expect(screen.getByRole('button', { name: 'Fri 15, Festival' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Tue 1, Payday' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sat 23' })).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Tue 1, Payday' }))
+    expect(onPick).toHaveBeenCalledWith(30)
+  })
+
+  it('lets the agent pick any day on the calendar and asks for that day\'s forecast', async () => {
+    api.agentRefillRequest.mockResolvedValue({})
+    const { u } = home()
+    await screen.findByText(t('statusRed'))
+    await u.click(await screen.findByRole('button', { name: 'Sat 23' }))
+    await waitFor(() => expect(api.agentForecast).toHaveBeenLastCalledWith(82))
+    await u.click(await screen.findByRole('button', { name: t('requestRefill') }))
+    expect(api.agentRefillRequest).toHaveBeenCalledWith(82)
+    await u.click(screen.getByRole('button', { name: t('scenarioNormal') }))
+    await waitFor(() => expect(api.agentForecast).toHaveBeenLastCalledWith('normal'))
+  })
+
+  it('shows the same calendar to operations and loads every agent for the picked day', async () => {
+    api.opsAgents.mockResolvedValue(OVERVIEW)
+    api.opsAgent.mockResolvedValue(RED)
+    api.opsCoverage.mockResolvedValue(COVERAGE)
+    api.opsLiquidityReport.mockResolvedValue(REPORT)
+    api.opsRefillRequests.mockResolvedValue({ requests: [] })
+    const u = userEvent.setup()
+    render(<AgentsTab />)
+    await u.click(await screen.findByRole('button', { name: 'Tue 15, Festival' }))
+    await waitFor(() => expect(api.opsAgents).toHaveBeenLastCalledWith(44))
+  })
+
+  it('zooms in and out, resets, and shows the estimated users near each area', async () => {
+    const u = userEvent.setup()
+    const agents = [{ agent_id: 1, name: 'Agent #2', area: 'Gulshan', status: 'green', lat: 23.792, lng: 90.414, nearby_users_est: 3120 }]
+    render(<AgentMap agents={agents} selected={null} onSelect={() => {}} />)
+    const map = screen.getByTestId('agent-map')
+    expect(map).toHaveAttribute('data-zoom', '1')
+    expect(screen.getByText(/Gulshan · ~3.1k users/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zoom out' })).toBeDisabled()
+    await u.click(screen.getByRole('button', { name: 'Zoom in' }))
+    await u.click(screen.getByRole('button', { name: 'Zoom in' }))
+    expect(Number(map.getAttribute('data-zoom'))).toBeCloseTo(2.25)
+    await u.click(screen.getByRole('button', { name: 'Zoom out' }))
+    expect(Number(map.getAttribute('data-zoom'))).toBeCloseTo(1.5)
+    await u.click(screen.getByRole('button', { name: 'Reset map' }))
+    expect(map).toHaveAttribute('data-zoom', '1')
   })
 })

@@ -410,3 +410,20 @@ table.plain th, table.plain td { text-align: left; padding: 8px 6px; border-bott
 .topbar .my-number { font-variant-numeric: tabular-nums; }
 .chip-demo { display: grid; gap: 0; text-align: left; line-height: 1.25; }
 .chip-demo small { font-size: 11px; color: #4a5568; font-variant-numeric: tabular-nums; }
+
+/* ---- Agent calendar strip and zoomable map ---- */
+.daystrip { display: flex; gap: 6px; overflow-x: auto; padding: 6px 2px 8px; scroll-snap-type: x proximity; }
+.daystrip .day { flex: 0 0 auto; min-width: 52px; display: grid; gap: 0; justify-items: center; background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 6px 4px; font: inherit; color: var(--ink); scroll-snap-align: center; }
+.daystrip .day small { font-size: 11px; color: #4a5568; }
+.daystrip .day strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.daystrip .day em { font-style: normal; font-size: 10px; font-weight: 700; min-height: 12px; }
+.daystrip .day.payday { border-color: #12805c; } .daystrip .day.payday em { color: #0b5c40; }
+.daystrip .day.festival { border-color: #b3261e; background: #fde3e1; } .daystrip .day.festival em { color: #8c1d17; }
+.daystrip .day.on { outline: 3px solid var(--blue); }
+.agent-map-wrap { display: grid; gap: 6px; }
+.map-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.map-controls button { border: 1.5px solid var(--line); background: #fff; border-radius: 10px; min-width: 38px; height: 34px; font: inherit; font-weight: 700; color: var(--ink); }
+.map-controls button:disabled { opacity: 0.5; }
+.map-controls small { color: #4a5568; }
+.agent-map { width: 100%; height: auto; max-height: 520px; user-select: none; }
+.map-label { fill: #14213d; pointer-events: none; font-weight: 700; paint-order: stroke; stroke: #fff; stroke-width: 2px; }

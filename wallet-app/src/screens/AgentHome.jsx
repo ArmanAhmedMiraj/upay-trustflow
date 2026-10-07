@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { errorText } from '../i18n.js'
 import { formatTaka, formatWhen } from '../format.js'
+import DayStrip from '../components/DayStrip.jsx'
 import ForecastChart from '../components/ForecastChart.jsx'
 
 const SCENARIOS = [['normal', 'scenarioNormal'], ['payday', 'scenarioPayday'], ['festival', 'scenarioFestival']]
@@ -11,6 +12,8 @@ const STATUS_TEXT = { red: 'statusRed', yellow: 'statusYellow', green: 'statusGr
 /** The agent's phone screen: how much cash they will need, when it runs out, and one tap to ask upay for a refill. */
 export default function AgentHome({ user, t, lang, onToggleLang, onLogout }) {
   const [scenario, setScenario] = useState('festival')
+  const [day, setDay] = useState(null)              // a day picked on the calendar; null = use the demo day above
+  const [days, setDays] = useState([])
   const [data, setData] = useState(null)
   const [requests, setRequests] = useState([])
   const [error, setError] = useState('')
@@ -22,8 +25,10 @@ export default function AgentHome({ user, t, lang, onToggleLang, onLogout }) {
   useEffect(() => {
     setData(null)
     setError('')
-    api.agentForecast(scenario).then(setData).catch((e) => setError(errorText(e, t)))
-  }, [scenario, t])
+    api.agentForecast(day ?? scenario).then(setData).catch((e) => setError(errorText(e, t)))
+  }, [scenario, day, t])
+
+  useEffect(() => { Promise.resolve().then(() => api.agentCalendar()).then((r) => setDays(r.days)).catch(() => {}) }, [])
 
   useEffect(() => {
     loadRequests()
@@ -35,7 +40,7 @@ export default function AgentHome({ user, t, lang, onToggleLang, onLogout }) {
     setBusy(true)
     setError('')
     try {
-      await api.agentRefillRequest(scenario)
+      await api.agentRefillRequest(day ?? scenario)
       setFlash(t('requestSent'))
       setTimeout(() => setFlash(''), 3500)
       loadRequests()
@@ -63,9 +68,15 @@ export default function AgentHome({ user, t, lang, onToggleLang, onLogout }) {
           <small className="muted">{t('demoDay')}</small>
           <div className="scenario-switch" role="group" aria-label={t('demoDay')}>
             {SCENARIOS.map(([key, label]) => (
-              <button key={key} className={scenario === key ? 'on' : ''} aria-pressed={scenario === key} onClick={() => setScenario(key)}>{t(label)}</button>
+              <button key={key} className={day === null && scenario === key ? 'on' : ''} aria-pressed={day === null && scenario === key} onClick={() => { setDay(null); setScenario(key) }}>{t(label)}</button>
             ))}
           </div>
+          {days.length > 0 && (
+            <>
+              <small className="muted">Calendar: tap any day to see the forecast for it (about two months; paydays and festivals are marked)</small>
+              <DayStrip days={days} selected={day ?? days.find((d) => d.scenario === scenario)?.day} onPick={setDay} label="Forecast calendar" />
+            </>
+          )}
         </div>
       )}
 

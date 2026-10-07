@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { errorText, makeT } from '../i18n.js'
 import { formatTaka, formatWhen } from '../format.js'
 import AgentMap from '../components/AgentMap.jsx'
+import DayStrip from '../components/DayStrip.jsx'
 import ForecastChart from '../components/ForecastChart.jsx'
 
 const t = makeT('en')
@@ -13,6 +14,9 @@ const pct = (x, d = 1) => `${(x * 100).toFixed(d)}%`
 /** Operations view of Module 2: who needs cash, when, how much, and where another agent would help. */
 export default function AgentsTab() {
   const [scenario, setScenario] = useState('festival')
+  const [day, setDay] = useState(null)              // a day picked on the calendar; null = the demo day buttons decide
+  const [days, setDays] = useState([])
+  const when = day ?? scenario
   const [data, setData] = useState(null)
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -27,6 +31,7 @@ export default function AgentsTab() {
   useEffect(() => {
     api.opsCoverage().then(setCoverage).catch((e) => setError(errorText(e, t)))
     api.opsLiquidityReport().then(setReport).catch(() => {})
+    Promise.resolve().then(() => api.opsCalendar()).then((r) => setDays(r.days)).catch(() => {})
     loadRequests()
     const id = setInterval(loadRequests, 5000)
     return () => clearInterval(id)
@@ -35,13 +40,13 @@ export default function AgentsTab() {
   useEffect(() => {
     setData(null)
     setError('')
-    api.opsAgents(scenario).then((r) => { setData(r); setSelected((s) => s ?? r.agents[0]?.agent_id ?? null) }).catch((e) => setError(errorText(e, t)))
-  }, [scenario])
+    api.opsAgents(when).then((r) => { setData(r); setSelected((s) => s ?? r.agents[0]?.agent_id ?? null) }).catch((e) => setError(errorText(e, t)))
+  }, [when])
 
   useEffect(() => {
     if (selected === null) return
-    api.opsAgent(selected, scenario).then(setDetail).catch((e) => setError(errorText(e, t)))
-  }, [selected, scenario])
+    api.opsAgent(selected, when).then(setDetail).catch((e) => setError(errorText(e, t)))
+  }, [selected, when])
 
   async function dispatch(id) {
     try {
@@ -62,10 +67,17 @@ export default function AgentsTab() {
         <h2>Agent cash: how much, when, and where</h2>
         <div className="scenario-switch" role="group" aria-label="Day">
           {SCENARIOS.map(([key, label]) => (
-            <button key={key} className={scenario === key ? 'on' : ''} aria-pressed={scenario === key} onClick={() => setScenario(key)}>{label}</button>
+            <button key={key} className={day === null && scenario === key ? 'on' : ''} aria-pressed={day === null && scenario === key}
+              onClick={() => { setDay(null); setScenario(key) }}>{label}</button>
           ))}
         </div>
       </div>
+      {days.length > 0 && (
+        <div className="panel">
+          <small className="muted">Calendar: pick any day to see every agent's forecast for it (paydays and festivals are marked)</small>
+          <DayStrip days={days} selected={day ?? days.find((d) => d.scenario === scenario)?.day} onPick={setDay} label="Forecast calendar" />
+        </div>
+      )}
       {error && <p className="error" role="alert">{error}</p>}
       {!data && !error && <p className="muted">Loading the forecast…</p>}
 

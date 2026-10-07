@@ -291,6 +291,17 @@ def ops_agents(day: int | None = None, scenario: str | None = None, user: User =
     return _world().overview(_day(day, scenario))
 
 
+@app.get("/ops/calendar")
+def ops_calendar(user: User = Depends(analyst_user)):
+    """The days the forecaster covers (about two months, with two festival rushes), for the calendar strip."""
+    return {"days": _world().days(), "scenarios": __import__("liq_service").SCENARIOS}
+
+
+@app.get("/agent/calendar")
+def agent_calendar(user: User = Depends(agent_user)):
+    return {"days": _world().days(), "scenarios": __import__("liq_service").SCENARIOS}
+
+
 @app.get("/ops/agents/{agent_id}")
 def ops_agent(agent_id: int, day: int | None = None, scenario: str | None = None, user: User = Depends(analyst_user)):
     w = _world()

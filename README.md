@@ -333,3 +333,9 @@ Our choice is not the highest raw score: unrestricted boosting is about 2 points
 - All data is synthetic. Validation on real upay data is the first step of any pilot.
 - Before the final we also prepared, on a private branch, a second experimental model and an analyst explanation view. They are not part of this repository; the graded-risk model and Risk Lab above were built separately during the final.
 - Known limits: quiet, unreported mule wallets are the weakest case, and the scam-type guess is only about 54% accurate.
+
+## Agent cash: calendar and map (added on final day)
+
+- **Calendar.** The agent app and the analyst Agents tab now show a day strip for every forecastable day of the simulated world (about 60 days). Paydays (1st–5th and 28th onward) and the two festival rushes are marked; tapping a day shows the forecast for that day, and "Ask for refill" uses the picked day.
+- **Zoomable Dhaka map.** The analyst tab's map zooms (buttons, mouse wheel) and pans (drag). Each area shows an estimated number of nearby upay users.
+- **Honest limits.** The calendar covers the simulated 60 days, not a full year. Nearby-user counts are *invented estimates* per area type (not live location data), shown for context and not used as a model input. The forecasting model was not retrained for this change, and no model comparison has been run for agent cash yet. Real live-location counts, a year-long calendar and a retrained, compared model are the planned next step.

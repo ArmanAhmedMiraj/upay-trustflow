@@ -52,6 +52,9 @@ async function request(method, path, body) {
   return data
 }
 
+// a forecast day is either a named demo day ('festival') or a simulated calendar day number
+const dayQuery = (d) => (typeof d === 'number' ? `day=${d}` : `scenario=${d}`)
+
 export const api = {
   login: (phone, pin) => request('POST', '/auth/login', { phone, pin }),
   register: (phone, name, pin) => request('POST', '/auth/register', { phone, name, pin }),
@@ -78,14 +81,16 @@ export const api = {
   labReport: () => request('GET', '/lab/report'),
   demoContacts: () => request('GET', '/demo/contacts'),
   // Module 2: agent cash forecasting
-  opsAgents: (scenario) => request('GET', `/ops/agents?scenario=${scenario}`),
-  opsAgent: (id, scenario) => request('GET', `/ops/agents/${id}?scenario=${scenario}`),
+  opsAgents: (scenario) => request('GET', `/ops/agents?${dayQuery(scenario)}`),
+  opsAgent: (id, scenario) => request('GET', `/ops/agents/${id}?${dayQuery(scenario)}`),
+  opsCalendar: () => request('GET', '/ops/calendar'),
+  agentCalendar: () => request('GET', '/agent/calendar'),
   opsCoverage: () => request('GET', '/ops/coverage'),
   opsLiquidityReport: () => request('GET', '/ops/liquidity-report'),
   opsRefillRequests: () => request('GET', '/ops/refill-requests'),
   dispatchRefill: (id) => request('POST', `/ops/refill-requests/${id}/dispatch`),
-  agentForecast: (scenario) => request('GET', `/agent/forecast?scenario=${scenario}`),
-  agentRefillRequest: (scenario) => request('POST', '/agent/refill-request', { scenario }),
+  agentForecast: (scenario) => request('GET', `/agent/forecast?${dayQuery(scenario)}`),
+  agentRefillRequest: (d) => request('POST', '/agent/refill-request', typeof d === 'number' ? { day: d } : { scenario: d }),
   agentRefillRequests: () => request('GET', '/agent/refill-requests'),
   analystCases: (status = 'held', limit = 100) => request('GET', `/analyst/cases?status=${status}&limit=${limit}`),
   approve: (id, note) => request('POST', `/analyst/cases/${id}/approve`, { note }),

@@ -108,3 +108,26 @@ def test_refill_requests_flow_from_the_agent_to_operations(client):
     assert client.post("/ops/refill-requests/9999/dispatch", headers=nadia).status_code == 404
     assert client.get("/agent/refill-requests", headers=babul).json()["requests"][0]["status"] == "dispatched"
     assert client.post(f"/ops/refill-requests/{sent['id']}/dispatch", headers=babul).status_code == 403   # agents cannot dispatch
+
+
+def test_calendar_lists_every_forecastable_day_with_paydays_and_festival_rushes(client):
+    import liq_service
+    h = login(client, "01911000001", "99999")
+    body = client.get("/ops/calendar", headers=h).json()
+    days = body["days"]
+    assert [d["day"] for d in days] == list(range(liq_service.DAY_MIN, liq_service.DAY_MAX + 1)) and len(days) >= 55
+    assert any(d["festival_rush"] for d in days) and any(d["payday"] for d in days) and any(not d["payday"] and not d["festival_rush"] for d in days)
+    assert {d["weekday"] for d in days} == {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+    assert body["scenarios"]["festival"] in [d["day"] for d in days]
+    assert client.get("/agent/calendar", headers=login(client, "01811000001")).status_code == 200
+    assert client.get("/ops/calendar", headers=login(client, "01811000001")).status_code == 403
+
+
+def test_every_listed_day_can_be_forecast_and_agents_carry_a_nearby_user_estimate(client):
+    h = login(client, "01911000001", "99999")
+    days = client.get("/ops/calendar", headers=h).json()["days"]
+    for d in (days[0]["day"], days[len(days) // 2]["day"], days[-1]["day"]):
+        r = client.get(f"/ops/agents?day={d}", headers=h)
+        assert r.status_code == 200 and r.json()["day"] == d
+        assert all(a["nearby_users_est"] > 1000 for a in r.json()["agents"])
+        assert client.get(f"/agent/forecast?day={d}", headers=login(client, "01811000001")).status_code == 200

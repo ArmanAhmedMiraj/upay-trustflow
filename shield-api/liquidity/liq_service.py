@@ -23,6 +23,15 @@ DEMO_NAMES = ["Agent Babul", "Agent Shiuli", "Agent Monir"]
 DEMO_PHONES = ["01811000001", "01811000002", "01811000003"]
 
 
+# Estimated active upay users within walking distance of an agent. INVENTED for the demo (no real counts exist here):
+# a base per area type, varied a little per agent. In a pilot this comes from upay's own active-user counts by location.
+USERS_BASE = {"garment": 5200, "residential": 3100, "campus": 3800, "market": 4600, "transit": 4100}
+
+
+def nearby_users_est(area_type: str, agent_id: int) -> int:
+    return int(round(USERS_BASE.get(area_type, 3000) * (0.8 + 0.4 * ((agent_id * 0.6180339887) % 1.0)), -1))
+
+
 def group_lakh(x) -> str:
     """1234567 -> '12,34,567' (Bangladesh groups the last three digits, then pairs)."""
     digits = str(int(round(abs(x))))
@@ -105,6 +114,7 @@ class World:
         name = DEMO_NAMES[self.demo_agents.index(agent_id)] if agent_id in self.demo_agents else f"Agent #{agent_id + 1}"
         s = {
             "agent_id": int(agent_id), "name": name, "area": ag.area, "area_type": ag.area_type, "lat": round(float(ag.lat), 4), "lng": round(float(ag.lng), 4),
+            "nearby_users_est": nearby_users_est(ag.area_type, int(agent_id)),
             "cash_now": round(cash), "float_now": round(efloat), "p50_out_24h": round(float(p50o[:24].sum())), "p90_out_24h": round(float(plan_out[:24].sum())),
             "need_cash_24h": round(need_cash), "need_float_24h": round(need_float),
             "runout_hours_from_now": k50 if k50 >= 0 else (k if k >= 0 else None),
@@ -157,6 +167,11 @@ class World:
         return {"day": day, "scenario": scenario, "calendar": self.calendar(day), "counts": counts,
                 "total_refill_cash": sum(r["refill_cash"] for r in rows), "total_refill_float": sum(r["refill_float"] for r in rows),
                 "agents": rows}
+
+    def days(self) -> list[dict]:
+        """Every day the forecaster can cover, with what makes it unusual (payday, festival rush ...), for the calendar view."""
+        scen = {v: k for k, v in SCENARIOS.items()}
+        return [{"day": d, "scenario": scen.get(d), **self.calendar(d)} for d in range(DAY_MIN, DAY_MAX + 1)]
 
     @staticmethod
     def calendar(day: int) -> dict:
