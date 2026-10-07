@@ -15,6 +15,8 @@ import json
 import os
 import time
 
+import tenants
+
 SIGNATURE_HEADER = "x-shield-signature"
 TIMESTAMP_HEADER = "x-shield-timestamp"
 MAX_AGE_SECONDS = 300
@@ -44,18 +46,23 @@ class SignedRequests:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        secret = os.getenv("SHIELD_API_SECRET", "").strip()
         path = scope.get("path", "")
-        if scope["type"] != "http" or not secret or path.endswith(OPEN_PATHS):
+        if scope["type"] != "http" or path.endswith(OPEN_PATHS):
             await self.app(scope, receive, send)
             return
+        headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+        multi = bool(tenants.load())
+        secret, tenant_id = tenants.secret_for(headers.get(tenants.TENANT_HEADER))
+        if not secret and not multi:                      # single-tenant mode with no secret: nothing is checked (demo, tests)
+            await self.app(scope, receive, send)
+            return
+        scope.setdefault("state", {})["tenant"] = tenant_id
         body, more = b"", True
         while more:
             message = await receive()
             body += message.get("body", b"")
             more = message.get("more_body", False)
-        headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
-        if not is_valid(secret, headers.get(TIMESTAMP_HEADER), headers.get(SIGNATURE_HEADER), body):
+        if not secret or not is_valid(secret, headers.get(TIMESTAMP_HEADER), headers.get(SIGNATURE_HEADER), body):
             payload = json.dumps({"detail": "Request is not signed correctly"}).encode()
             await send({"type": "http.response.start", "status": 401,
                         "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(payload)).encode())]})

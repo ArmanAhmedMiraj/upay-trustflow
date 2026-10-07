@@ -25,6 +25,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "transfer_risk"
 import messages  # noqa: E402
 import safety_check  # noqa: E402
 import request_auth  # noqa: E402
+import adapters  # noqa: E402
+import tenants  # noqa: E402
 import scorer  # noqa: E402
 from graded_risk import api as graded_api  # noqa: E402
 from graded_risk import live as graded_live  # noqa: E402
@@ -176,6 +178,28 @@ def risk_score(body: TransferFeatures, request: Request):
     art = _artifacts(request)
     t0 = time.perf_counter()
     result = scorer.score_transfer(body.model_dump(), art)
+    result["questions"] = safety_check.questions_for(result["scam_type"]) if result["action"] == "safety_check" else []
+    _attach_message(result, result["tier"], request)
+    result["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+    return result
+
+
+@app.post("/risk/score-adapted", response_model=RiskResponse)
+def risk_score_adapted(body: dict, request: Request):
+    """Score a transfer sent in the calling provider's OWN field names (see adapters.py, tenants.py).
+
+    The provider is the signed tenant of the call; its adapter turns the request into Shield's signals. The model,
+    thresholds and explanations are the same for every tenant. Shield stores nothing between calls."""
+    art = _artifacts(request)
+    tenant = getattr(request.state, "tenant", tenants.DEFAULT_TENANT)
+    t0 = time.perf_counter()
+    try:
+        features = TransferFeatures(**adapters.translate(tenants.adapter_name(tenant), body))
+    except KeyError as exc:
+        raise HTTPException(status_code=422, detail=f"Request is missing or not understood: {exc}")
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    result = scorer.score_transfer(features.model_dump(), art)
     result["questions"] = safety_check.questions_for(result["scam_type"]) if result["action"] == "safety_check" else []
     _attach_message(result, result["tier"], request)
     result["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
