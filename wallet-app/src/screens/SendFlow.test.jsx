@@ -7,7 +7,7 @@ import SendFlow from './SendFlow.jsx'
 
 vi.mock('../api.js', async (importOriginal) => {
   const real = await importOriginal()
-  return { ...real, api: { preview: vi.fn(), send: vi.fn(), transactions: vi.fn() } }
+  return { ...real, api: { preview: vi.fn(), send: vi.fn(), transactions: vi.fn(), demoContacts: vi.fn() } }
 })
 import { api } from '../api.js'
 
@@ -51,6 +51,7 @@ async function enterPinAndSend(user, label = t('sendNow'), pin = '12345') {
 beforeEach(() => {
   vi.clearAllMocks()
   api.transactions.mockResolvedValue({ transactions: [] })
+  api.demoContacts.mockRejectedValue(new Error('demo tools are off'))      // no demo contacts unless a test asks
 })
 
 describe('Send money: everyday payment', () => {
@@ -300,5 +301,52 @@ describe('Send money: closing', () => {
     const { user, onClose } = setup()
     await user.click(screen.getByRole('button', { name: t('close') }))
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('Send money: demo contacts', () => {
+  const CONTACTS = [
+    { key: 'mum', name: 'Rahima Begum (Mum)', phone: '01711000002', level: 'low', level_label: 'Goes through', why: 'Family: years of history.' },
+    { key: 'rina', name: 'Rina Sultana', phone: '01613308841', level: 'hold', level_label: 'Held 30 minutes', why: 'A 6-day-old wallet on a 5-day-old SIM.' },
+  ]
+
+  it('shows no demo panel when the demo tools are off', async () => {
+    setup()
+    await screen.findByLabelText(t('recipientPhone'))
+    expect(screen.queryByText(/Demo contacts/)).not.toBeInTheDocument()
+  })
+
+  it('lists each contact with its name, number and level, and fills in the number when picked', async () => {
+    api.demoContacts.mockResolvedValue({ contacts: CONTACTS })
+    const { user } = setup()
+    const rina = await screen.findByRole('button', { name: /Rina Sultana/ })
+    expect(rina).toHaveTextContent('01613 308841')
+    expect(rina).toHaveTextContent('Held 30 minutes')
+    expect(screen.getByRole('button', { name: /Rahima Begum/ })).toHaveTextContent('Goes through')
+    await user.click(rina)
+    expect(screen.getByLabelText(t('recipientPhone'))).toHaveValue('01613308841')
+    expect(rina).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('says what the number triggers and why, before anything is sent', async () => {
+    api.demoContacts.mockResolvedValue({ contacts: CONTACTS })
+    const { user } = setup()
+    expect(screen.queryByText(/Expected:/)).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Rina Sultana/ }))
+    const why = screen.getByRole('status')
+    expect(why).toHaveTextContent('Expected: Held 30 minutes.')
+    expect(why).toHaveTextContent('A 6-day-old wallet on a 5-day-old SIM.')
+    expect(why).toHaveTextContent('The AI decides again when you continue')
+  })
+
+  it('still goes through the normal review and PIN steps (the contact only fills in the number)', async () => {
+    api.demoContacts.mockResolvedValue({ contacts: CONTACTS })
+    api.preview.mockResolvedValue({ recipient: { name: 'Rina Sultana', phone: '01613308841' }, risk: HOLD })
+    const { user } = setup()
+    await user.click(await screen.findByRole('button', { name: /Rina Sultana/ }))
+    await user.type(screen.getByLabelText(t('amount')), '3000')
+    await user.click(btn(t('continue')))
+    expect(await screen.findByText(t('holdAndSend'))).toBeInTheDocument()
+    expect(api.preview).toHaveBeenCalledWith('01613308841', 3000, expect.anything(), undefined)
   })
 })

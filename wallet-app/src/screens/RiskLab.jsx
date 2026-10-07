@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api.js'
 import { errorText, makeT } from '../i18n.js'
+import { formatPhone, formatTaka } from '../format.js'
 
 const t = makeT('en')
 
@@ -15,138 +16,149 @@ const TIERS = {
   high: ['High', 'Ask safety-check questions'],
   very_high: ['Very high', 'Hold for 30 minutes'],
 }
-const CREDIT_AGES = [[5, '5 minutes ago'], [60, '1 hour ago'], [1440, '1 day ago'], [2000, 'a day or more ago'], [10080, 'a week ago']]
+const EMPTY_FILTERS = { sender: '', recipient: '', name: '', since: '', until: '' }
 const pts = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`
-const hourText = (h) => `${String(Math.floor(h)).padStart(2, '0')}:00`
+const dhaka = (iso) => new Date(`${iso}Z`).toLocaleString('en-GB', {
+  timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+})
 
-/** The analyst's Risk Lab: build a transfer from a sender, a recipient and the live details, and watch how each signal moves the score. */
+/**
+ * The analyst's Risk Lab: a log of REAL transfers. Each one is scored by the graded-risk model at the moment it happens;
+ * nothing is pre-filled. Pick a transfer to see how every signal moved its score.
+ */
 export default function RiskLab() {
-  const [accounts, setAccounts] = useState(null)
-  const [report, setReport] = useState(null)
-  const [senderId, setSenderId] = useState('')
-  const [recipientId, setRecipientId] = useState('')
-  const [tx, setTx] = useState(null)
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [options, setOptions] = useState({ senders: [], recipients: [], total: 0 })
+  const [entries, setEntries] = useState(null)
+  const [selected, setSelected] = useState(null)
   const [muted, setMuted] = useState([])
   const [result, setResult] = useState(null)
+  const [report, setReport] = useState(null)
   const [error, setError] = useState('')
+  const [explainError, setExplainError] = useState('')
   const [showAll, setShowAll] = useState(false)
-  const [scenarioId, setScenarioId] = useState('')
+  const filtersRef = useRef(filters)
   const ticket = useRef(0)
+  filtersRef.current = filters
 
-  useEffect(() => {
-    api.labAccounts().then((a) => {
-      setAccounts(a)
-      const first = a.scenarios.find((s) => s.id === 'officer') ?? a.scenarios[0]
-      applyScenario(first, a)
-    }).catch((e) => setError(errorText(e, t)))
-    api.labReport().then(setReport).catch(() => {})
+  const load = useCallback(() => {
+    const f = filtersRef.current
+    const params = new URLSearchParams()
+    Object.entries(f).forEach(([k, v]) => v && params.set(k, v))
+    Promise.all([api.labTransactions(params.toString()), api.labFilters()])
+      .then(([list, opts]) => { setEntries(list.entries); setOptions(opts); setError('') })
+      .catch((e) => setError(errorText(e, t)))
   }, [])
 
-  function applyScenario(s, a = accounts) {
-    setScenarioId(s.id)
-    setSenderId(s.sender)
-    setRecipientId(s.recipient)
-    setTx({ ...a.default_tx, ...s.tx })
-    setMuted([])
-  }
+  useEffect(() => { load() }, [load, filters])
+  useEffect(() => {                                   // new transfers show up by themselves
+    const timer = setInterval(load, 5000)
+    return () => clearInterval(timer)
+  }, [load])
+  useEffect(() => { api.labReport().then(setReport).catch(() => {}) }, [])
 
   useEffect(() => {
-    if (!senderId || !recipientId || !tx) return undefined
+    if (!selected) return undefined
     const mine = ++ticket.current
-    const timer = setTimeout(() => {
-      api.labScore({ sender_id: senderId, recipient_id: recipientId, tx, mute_sides: muted })
-        .then((r) => { if (mine === ticket.current) { setResult(r); setError('') } })
-        .catch((e) => { if (mine === ticket.current) setError(errorText(e, t)) })
-    }, 200)
-    return () => clearTimeout(timer)
-  }, [senderId, recipientId, tx, muted])
+    api.labExplain(selected.id, { mute_sides: muted })
+      .then((r) => { if (mine === ticket.current) { setResult(r); setExplainError('') } })
+      .catch((e) => { if (mine === ticket.current) { setResult(null); setExplainError(errorText(e, t)) } })
+    return () => { ticket.current += 1 }
+  }, [selected, muted])
 
-  const setField = (k, v) => { setScenarioId(''); setTx((x) => ({ ...x, [k]: v })) }
+  const setFilter = (k, v) => setFilters((f) => ({ ...f, [k]: v }))
+  const choose = (entry) => { setSelected(entry); setMuted([]); setResult(null); setExplainError('') }
   const toggleSide = (s) => setMuted((m) => (m.includes(s) ? m.filter((x) => x !== s) : [...m, s]))
-
-  const sender = accounts?.senders.find((s) => s.id === senderId)
-  const recipient = accounts?.recipients.find((r) => r.id === recipientId)
-  const scenario = accounts?.scenarios.find((s) => s.id === scenarioId)
-
-  if (!accounts) {
-    return <section className="lab"><p className={error ? 'error' : 'muted'} role={error ? 'alert' : 'status'}>{error || 'Loading the Risk Lab…'}</p></section>
-  }
+  const filtered = Object.values(filters).some(Boolean)
+  const hasFilterRows = useMemo(() => entries !== null && entries.length > 0, [entries])
 
   return (
     <section className="lab">
       <div className="lab-intro">
-        <h2>How the AI scores a transfer</h2>
+        <h2>Risk Lab: every real transfer, scored</h2>
         <p>
-          Pick a sender and a recipient, change the live details, and see how each of the 31 signals pushes the risk up or down.
-          The model reads three groups at once: <strong>sender behaviour</strong>, the <strong>recipient account</strong> and the <strong>link</strong> between them.
+          Each transfer made in the wallet is scored by the AI the moment it happens and listed here. Nothing is pre-filled:
+          until someone sends money, this list is empty. Pick a transfer to see how each of the 31 signals pushed its risk.
         </p>
       </div>
 
-      <div className="lab-presets" role="group" aria-label="Ready-made stories">
-        {accounts.scenarios.map((s) => (
-          <button key={s.id} className={`lab-chip ${s.id === scenarioId ? 'on' : ''}`} aria-pressed={s.id === scenarioId} onClick={() => applyScenario(s)}>{s.title}</button>
-        ))}
-      </div>
-      {scenario && <p className="lab-shows"><strong>What this shows:</strong> {scenario.shows}</p>}
+      <form className="lab-panel lab-filters" onSubmit={(e) => e.preventDefault()} aria-label="Filter transfers">
+        <label>Sender number
+          <select value={filters.sender} onChange={(e) => setFilter('sender', e.target.value)}>
+            <option value="">All senders</option>
+            {options.senders.map((o) => <option key={o.phone} value={o.phone}>{formatPhone(o.phone)} · {o.name}</option>)}
+          </select>
+        </label>
+        <label>Recipient number
+          <select value={filters.recipient} onChange={(e) => setFilter('recipient', e.target.value)}>
+            <option value="">All recipients</option>
+            {options.recipients.map((o) => <option key={o.phone} value={o.phone}>{formatPhone(o.phone)} · {o.name}</option>)}
+          </select>
+        </label>
+        <label>Registered name
+          <input type="search" value={filters.name} onChange={(e) => setFilter('name', e.target.value)} placeholder="Sender or recipient name" />
+        </label>
+        <label>From (Bangladesh time)
+          <input type="datetime-local" value={filters.since} onChange={(e) => setFilter('since', e.target.value)} />
+        </label>
+        <label>To (Bangladesh time)
+          <input type="datetime-local" value={filters.until} onChange={(e) => setFilter('until', e.target.value)} />
+        </label>
+        <div className="lab-filter-actions">
+          <button type="button" className="lab-chip" onClick={() => setFilters(EMPTY_FILTERS)} disabled={!filtered}>Clear filters</button>
+          <button type="button" className="lab-chip" onClick={load}>Refresh</button>
+        </div>
+      </form>
+
       {error && <p className="error" role="alert">{error}</p>}
 
-      <div className="lab-grid">
-        <div className="lab-panel lab-controls">
-          <h3>1. Build the transfer</h3>
-          <label>Sender
-            <select value={senderId} onChange={(e) => { setScenarioId(''); setSenderId(e.target.value) }}>
-              {accounts.senders.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
-          {sender && <p className="lab-note">{sender.bio}. District: {sender.district}.</p>}
-
-          <label>Recipient
-            <select value={recipientId} onChange={(e) => { setScenarioId(''); setRecipientId(e.target.value) }}>
-              {accounts.recipients.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </label>
-          {recipient && (
-            <div className="lab-recipient">
-              <p className="lab-note">{recipient.story}</p>
-              <dl className="lab-facts">
-                {Object.entries(recipient.facts).map(([k, v]) => (
-                  <div key={k}><dt>{k}</dt><dd>{typeof v === 'boolean' ? (v ? 'yes' : 'no') : String(v)}</dd></div>
+      <div className="lab-panel lab-log">
+        <h3>Transfers <small>{entries === null ? '' : `${entries.length} shown of ${options.total} recorded`}</small></h3>
+        {entries === null && !error && <p className="muted" role="status">Loading…</p>}
+        {entries !== null && options.total === 0 && (
+          <p className="lab-empty" role="status">
+            <strong>No transactions yet.</strong> Log in as a demo customer, choose Send money and make a transfer: it will be scored
+            and appear here within a few seconds.
+          </p>
+        )}
+        {entries !== null && options.total > 0 && !hasFilterRows && <p className="lab-empty" role="status">No transfers match these filters.</p>}
+        {hasFilterRows && (
+          <div className="lab-table-wrap">
+            <table className="lab-table" aria-label="Real transfers">
+              <thead>
+                <tr><th>Time (Dhaka)</th><th>Sender</th><th>Recipient</th><th>Amount</th><th>Risk</th><th>Outcome</th></tr>
+              </thead>
+              <tbody>
+                {entries.map((e) => (
+                  <tr key={e.id} className={selected?.id === e.id ? 'on' : ''}>
+                    <td>
+                      <button type="button" className="lab-rowbtn" aria-pressed={selected?.id === e.id} onClick={() => choose(e)}
+                        aria-label={`Open transfer ${e.id}: ${e.sender.name} to ${e.recipient.name}`}>{dhaka(e.created_at)}</button>
+                    </td>
+                    <td>{e.sender.name}<small>{formatPhone(e.sender.phone)}</small></td>
+                    <td>{e.recipient.name}<small>{formatPhone(e.recipient.phone)}</small></td>
+                    <td>{formatTaka(e.amount, 'en')}</td>
+                    <td>{e.risk_pct === null ? '—' : <span className={`lab-pill tier-${e.tier}`}>{e.risk_pct.toFixed(1)}% · {TIERS[e.tier][0]}</span>}</td>
+                    <td>{e.status === 'held' ? 'Held' : 'Sent'}</td>
+                  </tr>
                 ))}
-              </dl>
-            </div>
-          )}
-
-          <fieldset className="lab-fields">
-            <legend>Live details of the payment</legend>
-            <label>Amount (৳)
-              <input type="number" min="1" max="1000000" step="100" value={tx.amount}
-                onChange={(e) => setField('amount', Math.max(1, Number(e.target.value) || 1))} />
-            </label>
-            <label>Time of day: {hourText(tx.hour)}
-              <input type="range" min="0" max="23" value={tx.hour} onChange={(e) => setField('hour', Number(e.target.value))} />
-            </label>
-            <label>Seconds on the confirm screen: {tx.hesitation_secs}
-              <input type="range" min="1" max="60" value={tx.hesitation_secs} onChange={(e) => setField('hesitation_secs', Number(e.target.value))} />
-            </label>
-            <label>Times the amount was edited: {tx.amount_edits}
-              <input type="range" min="0" max="5" value={tx.amount_edits} onChange={(e) => setField('amount_edits', Number(e.target.value))} />
-            </label>
-            <label>Sender last received money
-              <select value={tx.mins_since_credit} onChange={(e) => setField('mins_since_credit', Number(e.target.value))}>
-                {CREDIT_AGES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            </label>
-            <label className="lab-check"><input type="checkbox" checked={!!tx.on_call} onChange={(e) => setField('on_call', e.target.checked ? 1 : 0)} /> Sender is on a phone call</label>
-            <label className="lab-check"><input type="checkbox" checked={!!tx.new_device} onChange={(e) => setField('new_device', e.target.checked ? 1 : 0)} /> Sender logged in from a new device</label>
-            <label className="lab-check"><input type="checkbox" checked={!!tx.sms_claim_mismatch} onChange={(e) => setField('sms_claim_mismatch', e.target.checked ? 1 : 0)} /> An SMS says money arrived, but the ledger shows none</label>
-          </fieldset>
-        </div>
-
-        <div className="lab-panel lab-result" aria-live="polite">
-          <h3>2. What the AI decides</h3>
-          {!result ? <p className="muted">Scoring…</p> : <Result result={result} muted={muted} toggleSide={toggleSide} showAll={showAll} setShowAll={setShowAll} />}
-        </div>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
+
+      {selected && (
+        <div className="lab-panel lab-result" aria-live="polite">
+          <h3>
+            {selected.sender.name} → {selected.recipient.name}{' '}
+            <small>{formatTaka(selected.amount, 'en')} · {formatPhone(selected.sender.phone)} → {formatPhone(selected.recipient.phone)}</small>
+          </h3>
+          {explainError && <p className="error" role="alert">{explainError}</p>}
+          {!result && !explainError && <p className="muted">Explaining…</p>}
+          {result && <Result result={result} muted={muted} toggleSide={toggleSide} showAll={showAll} setShowAll={setShowAll} />}
+        </div>
+      )}
 
       {report && <Evidence report={report} />}
     </section>

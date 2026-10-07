@@ -36,7 +36,7 @@ describe('App', () => {
     api.login.mockResolvedValue({ token: 'tok123', user: RAHIM })
     const user = userEvent.setup()
     render(<App />)
-    await user.click(screen.getByRole('button', { name: 'Rahim' }))
+    await user.click(screen.getByRole('button', { name: /Rahim/ }))
     await user.click(screen.getByRole('button', { name: t('login') }))
     expect(await screen.findByTestId('balance')).toHaveTextContent('৳44,111')
     expect(localStorage.getItem('upay_token')).toBe('tok123')

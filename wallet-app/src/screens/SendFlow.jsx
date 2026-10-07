@@ -24,6 +24,7 @@ export default function SendFlow({ user, t, lang, onClose, onSent, onHeld }) {
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(null)
   const [recents, setRecents] = useState([])
+  const [contacts, setContacts] = useState([])     // demo only: people to pick, each with the level it triggers
 
   const startedAt = useRef(Date.now())      // how long the customer hesitates is one of Shield's signals
   const edits = useRef(0)                   // so is how often they change the amount
@@ -42,6 +43,7 @@ export default function SendFlow({ user, t, lang, onClose, onSent, onHeld }) {
         setRecents([...seen].slice(0, 4).map(([p, n]) => ({ phone: p, name: n })))
       })
       .catch(() => {})
+    Promise.resolve().then(() => api.demoContacts()).then((r) => setContacts(r.contacts)).catch(() => {})   // demo tools may be off
   }, [])
 
   const value = Number(amount)
@@ -51,6 +53,7 @@ export default function SendFlow({ user, t, lang, onClose, onSent, onHeld }) {
     on_call: onCall,
   })
   const answerList = () => Object.entries(answers).map(([question_id, answer]) => ({ question_id, answer }))
+  const picked = contacts.find((c) => c.phone === phone)
   const needsAck = risk ? NEEDS_ACK.includes(risk.action) : false
 
   async function check(event) {
@@ -146,6 +149,27 @@ export default function SendFlow({ user, t, lang, onClose, onSent, onHeld }) {
               <div className="quick">
                 {recents.map((r) => <button type="button" key={r.phone} className="chip" onClick={() => setPhone(r.phone)}>{r.name.split(' ')[0]}</button>)}
               </div>
+            </div>
+          )}
+          {contacts.length > 0 && (
+            <div className="demo-contacts">
+              <small>Demo contacts: pick a number to see what the AI does</small>
+              <div className="demo-list" role="group" aria-label="Demo contacts">
+                {contacts.map((c) => (
+                  <button type="button" key={c.phone} className={`demo-contact level-${c.level} ${c.phone === phone ? 'on' : ''}`}
+                    aria-pressed={c.phone === phone} onClick={() => setPhone(c.phone)}>
+                    <strong>{c.name}</strong>
+                    <span>{formatPhone(c.phone)}</span>
+                    <em>{c.level_label}</em>
+                  </button>
+                ))}
+              </div>
+              {picked && (
+                <p className={`demo-why level-${picked.level}`} role="status">
+                  <strong>Expected: {picked.level_label}.</strong> {picked.why}
+                  <small>Level shown for a payment of about ৳3,000 from any demo account. The AI decides again when you continue.</small>
+                </p>
+              )}
             </div>
           )}
           <label>

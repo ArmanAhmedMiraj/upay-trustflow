@@ -71,10 +71,12 @@ export const api = {
   impact: (hours = 168) => request('GET', `/analyst/impact?hours=${hours}`),
   modelReport: () => request('GET', '/analyst/model-report'),
   resetDemo: () => request('POST', '/demo/reset'),
-  // Risk Lab (analysts): how the graded-risk model scores a sender-recipient pair, signal by signal
-  labAccounts: () => request('GET', '/lab/accounts'),
+  // Risk Lab (analysts): real transfers scored by the graded-risk model, signal by signal
+  labTransactions: (query = '') => request('GET', `/lab/transactions${query ? `?${query}` : ''}`),
+  labFilters: () => request('GET', '/lab/filters'),
+  labExplain: (id, body) => request('POST', `/lab/transactions/${id}/explain`, body),
   labReport: () => request('GET', '/lab/report'),
-  labScore: (body) => request('POST', '/lab/score', body),
+  demoContacts: () => request('GET', '/demo/contacts'),
   // Module 2: agent cash forecasting
   opsAgents: (scenario) => request('GET', `/ops/agents?scenario=${scenario}`),
   opsAgent: (id, scenario) => request('GET', `/ops/agents/${id}?scenario=${scenario}`),

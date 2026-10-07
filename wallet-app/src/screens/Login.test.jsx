@@ -94,9 +94,16 @@ describe('Login screen', () => {
 
   it('fills in a demo account with one tap', async () => {
     const { user } = setup()
-    await user.click(screen.getByRole('button', { name: 'Rahim' }))
+    await user.click(screen.getByRole('button', { name: /Rahim/ }))
     expect(phoneBox()).toHaveValue('01711000001')
     expect(pinBox()).toHaveValue('12345')
+  })
+
+  it('shows each demo account\'s phone number next to its name', () => {
+    setup()
+    expect(screen.getByRole('button', { name: /Rahim/ })).toHaveTextContent('01711 000001')
+    expect(screen.getByRole('button', { name: /Nusrat/ })).toHaveTextContent('01711 000005')
+    expect(screen.getByRole('button', { name: /Sumon/ })).toHaveTextContent('01711 000006')
   })
 
   it('shows a notice, for example after the session expired', () => {

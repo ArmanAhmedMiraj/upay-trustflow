@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import { errorText } from '../i18n.js'
-import { isValidPhone, isValidPin } from '../format.js'
+import { formatPhone, isValidPhone, isValidPin } from '../format.js'
 
 const DEMO_ACCOUNTS = [
   { label: 'Rahim', phone: '01711000001', pin: '12345' },
@@ -77,7 +77,9 @@ export default function Login({ t, lang, onToggleLang, onLoggedIn, notice }) {
         <div className="demo">
           <span>{t('demoLogin')}</span>
           {DEMO_ACCOUNTS.map((a) => (
-            <button key={a.phone} type="button" className="chip" onClick={() => { setPhone(a.phone); setPin(a.pin); setError('') }}>{a.label}</button>
+            <button key={a.phone} type="button" className="chip chip-demo" onClick={() => { setPhone(a.phone); setPin(a.pin); setError('') }}>
+              <strong>{a.label}</strong><small>{formatPhone(a.phone)}</small>
+            </button>
           ))}
         </div>
       )}

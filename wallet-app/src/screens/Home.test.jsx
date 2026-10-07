@@ -35,6 +35,11 @@ beforeEach(() => {
 })
 
 describe('Home screen', () => {
+  it('shows the signed-in person\'s own phone number under their name', async () => {
+    setup()
+    expect(await screen.findByText('01711 000001')).toBeInTheDocument()
+  })
+
   it('greets the customer by first name and shows the balance in lakh style', async () => {
     setup({ user: { ...user0, balance: 123456 } })
     expect(screen.getByText('Rahim')).toBeInTheDocument()

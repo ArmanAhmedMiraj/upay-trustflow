@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { errorText } from '../i18n.js'
-import { formatTaka } from '../format.js'
+import { formatPhone, formatTaka } from '../format.js'
 import CashOutSheet from '../components/CashOutSheet.jsx'
 import DemoTools from '../components/DemoTools.jsx'
 import ReportSheet from '../components/ReportSheet.jsx'
@@ -64,6 +64,7 @@ export default function Home({ user, setUser, t, lang, onToggleLang, onLogout, g
         <div>
           <small>{t('hello')},</small>
           <strong>{user.name.split(' ')[0]}</strong>
+          <small className="my-number">{formatPhone(user.phone)}</small>
         </div>
         <div className="topbar-actions">
           <button className="lang" onClick={onToggleLang} aria-label="Change language">{t('language')}</button>

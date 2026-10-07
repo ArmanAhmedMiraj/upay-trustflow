@@ -366,3 +366,47 @@ table.plain th, table.plain td { text-align: left; padding: 8px 6px; border-bott
 .lab-evidence table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
 .lab-evidence th, .lab-evidence td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 @media (max-width: 900px) { .lab-grid { grid-template-columns: 1fr; } .lab-sides li { grid-template-columns: 1fr 64px; } .lab-sides .lab-bar { grid-column: 1 / -1; order: 3; } }
+
+/* ---- Risk Lab: real-transfer log and filters ---- */
+.lab-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+.lab-filters label { display: grid; gap: 6px; font-size: 13px; color: #3b4559; font-weight: 600; min-width: 0; }
+.lab-filters select, .lab-filters input { font: inherit; padding: 9px 10px; border: 1.5px solid var(--line); border-radius: 10px; background: #fbfcff; color: var(--ink); min-width: 0; width: 100%; }
+.lab-filter-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lab-chip:disabled { opacity: 0.55; }
+.lab-log h3 { margin: 0 0 10px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.lab-log h3 small { color: #4a5568; font-weight: 600; font-size: 13px; }
+.lab-empty { margin: 0; padding: 18px; border-radius: 12px; background: #eef3ff; color: #2f3a52; line-height: 1.5; }
+.lab-table-wrap { overflow-x: auto; }
+.lab-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+.lab-table th { text-align: left; font-size: 12px; color: #4a5568; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.lab-table td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.lab-table td small { display: block; color: #4a5568; font-size: 12px; font-variant-numeric: tabular-nums; }
+.lab-table tr.on td { background: #eef3ff; }
+.lab-rowbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--blue-dark); text-decoration: underline; font-variant-numeric: tabular-nums; text-align: left; }
+.lab-pill { display: inline-block; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; background: #eef2f8; color: #14213d; }
+.lab-pill.tier-low { background: #e6f5ee; color: #0b5c40; }
+.lab-pill.tier-note { background: #fff6dc; color: #6b4b00; }
+.lab-pill.tier-high { background: #ffe9d6; color: #8a3a05; }
+.lab-pill.tier-very_high { background: #fde3e1; color: #8c1d17; }
+.lab-result h3 small { display: block; font-size: 13px; color: #4a5568; font-weight: 600; margin-top: 2px; }
+
+/* ---- Demo contacts in the send screen, and the number on the home screen and login chips ---- */
+.demo-contacts { display: grid; gap: 8px; margin: 4px 0 12px; }
+.demo-contacts > small { color: var(--muted); font-weight: 700; font-size: 12px; }
+.demo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.demo-contact { display: grid; gap: 1px; text-align: left; background: #fff; border: 1.5px solid var(--line); border-left-width: 6px; border-radius: 12px; padding: 8px 10px; font: inherit; color: var(--ink); min-width: 0; }
+.demo-contact strong { font-size: 13px; overflow-wrap: anywhere; }
+.demo-contact span { font-size: 12px; color: #4a5568; font-variant-numeric: tabular-nums; }
+.demo-contact em { font-style: normal; font-size: 12px; font-weight: 700; }
+.demo-contact.on { outline: 2px solid var(--blue); }
+.demo-contact.level-low { border-left-color: #12805c; } .demo-contact.level-low em { color: #0b5c40; }
+.demo-contact.level-note { border-left-color: #b58100; } .demo-contact.level-note em { color: #6b4b00; }
+.demo-contact.level-check { border-left-color: #c4540a; } .demo-contact.level-check em { color: #8a3a05; }
+.demo-contact.level-hold { border-left-color: #b3261e; } .demo-contact.level-hold em { color: #8c1d17; }
+.demo-why { margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 13px; line-height: 1.45; display: grid; gap: 4px; color: #14213d; background: #eef2f8; }
+.demo-why small { color: #3b4559; }
+.demo-why.level-low { background: #e6f5ee; } .demo-why.level-note { background: #fff6dc; }
+.demo-why.level-check { background: #ffe9d6; } .demo-why.level-hold { background: #fde3e1; }
+.topbar .my-number { font-variant-numeric: tabular-nums; }
+.chip-demo { display: grid; gap: 0; text-align: left; line-height: 1.25; }
+.chip-demo small { font-size: 11px; color: #4a5568; font-variant-numeric: tabular-nums; }
