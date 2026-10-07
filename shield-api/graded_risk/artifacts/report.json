@@ -1,0 +1,668 @@
+{
+ "data": {
+  "transfers": 200000,
+  "train": 120000,
+  "calibration": 40000,
+  "test": 40000,
+  "scams_in_test": 2000,
+  "scam_rate_pct": 5.0,
+  "note": "Synthetic data. The scam rate is far higher than real life, so the percentages describe this mix."
+ },
+ "signals": {
+  "total": 31,
+  "sender": 10,
+  "recipient": 15,
+  "pair": 6
+ },
+ "tiers": {
+  "note": 0.098,
+  "high": 0.2776,
+  "very_high": 0.6193
+ },
+ "friction_budget_pct_of_genuine": {
+  "note": 5.0,
+  "high": 1.5,
+  "very_high": 0.3
+ },
+ "headline": {
+  "pr_auc": 0.796,
+  "roc_auc": 0.956,
+  "caught_at_hold_tier": 0.542,
+  "genuine_disturbed_pct_at_hold": 0.27,
+  "precision_at_hold": 0.913,
+  "calibration_error": 0.0045
+ },
+ "which_sides_are_needed": {
+  "sender signals only": {
+   "pr_auc": 0.245,
+   "roc_auc": 0.826,
+   "caught_at_hold_tier": 0.056,
+   "signals": 10
+  },
+  "recipient signals only": {
+   "pr_auc": 0.575,
+   "roc_auc": 0.892,
+   "caught_at_hold_tier": 0.311,
+   "signals": 15
+  },
+  "sender + recipient (no link signals)": {
+   "pr_auc": 0.696,
+   "roc_auc": 0.938,
+   "caught_at_hold_tier": 0.418,
+   "signals": 25
+  },
+  "all three sides": {
+   "pr_auc": 0.796,
+   "roc_auc": 0.956,
+   "caught_at_hold_tier": 0.542,
+   "signals": 31
+  }
+ },
+ "switch_a_whole_side_off": {
+  "sender": {
+   "pr_auc": 0.689,
+   "caught_at_hold_tier": 0.114
+  },
+  "recipient": {
+   "pr_auc": 0.487,
+   "caught_at_hold_tier": 0.032
+  },
+  "pair": {
+   "pr_auc": 0.69,
+   "caught_at_hold_tier": 0.166
+  }
+ },
+ "switch_one_signal_off_worst5": [
+  {
+   "signal": "r_inflow_count_24h",
+   "side": "recipient",
+   "pr_auc_drop": 0.068,
+   "caught_drop": 0.075
+  },
+  {
+   "signal": "i_first_time_recipient",
+   "side": "pair",
+   "pr_auc_drop": 0.028,
+   "caught_drop": 0.195
+  },
+  {
+   "signal": "r_wallets_per_nid",
+   "side": "recipient",
+   "pr_auc_drop": 0.026,
+   "caught_drop": 0.103
+  },
+  {
+   "signal": "i_sms_claim_mismatch",
+   "side": "pair",
+   "pr_auc_drop": 0.025,
+   "caught_drop": 0.072
+  },
+  {
+   "signal": "s_on_call",
+   "side": "sender",
+   "pr_auc_drop": 0.022,
+   "caught_drop": 0.071
+  }
+ ],
+ "switch_one_signal_off_all": [
+  {
+   "signal": "r_inflow_count_24h",
+   "side": "recipient",
+   "pr_auc_drop": 0.068,
+   "caught_drop": 0.075
+  },
+  {
+   "signal": "i_first_time_recipient",
+   "side": "pair",
+   "pr_auc_drop": 0.028,
+   "caught_drop": 0.195
+  },
+  {
+   "signal": "r_wallets_per_nid",
+   "side": "recipient",
+   "pr_auc_drop": 0.026,
+   "caught_drop": 0.103
+  },
+  {
+   "signal": "i_sms_claim_mismatch",
+   "side": "pair",
+   "pr_auc_drop": 0.025,
+   "caught_drop": 0.072
+  },
+  {
+   "signal": "s_on_call",
+   "side": "sender",
+   "pr_auc_drop": 0.022,
+   "caught_drop": 0.071
+  },
+  {
+   "signal": "r_median_hold_mins",
+   "side": "recipient",
+   "pr_auc_drop": 0.021,
+   "caught_drop": 0.095
+  },
+  {
+   "signal": "s_balance_share",
+   "side": "sender",
+   "pr_auc_drop": 0.02,
+   "caught_drop": 0.12
+  },
+  {
+   "signal": "r_first_time_senders_24h",
+   "side": "recipient",
+   "pr_auc_drop": 0.018,
+   "caught_drop": 0.082
+  },
+  {
+   "signal": "s_amount_zscore",
+   "side": "sender",
+   "pr_auc_drop": 0.013,
+   "caught_drop": 0.075
+  },
+  {
+   "signal": "s_round_amount",
+   "side": "sender",
+   "pr_auc_drop": 0.013,
+   "caught_drop": 0.094
+  },
+  {
+   "signal": "r_cashout_agents_7d",
+   "side": "recipient",
+   "pr_auc_drop": 0.013,
+   "caught_drop": 0.059
+  },
+  {
+   "signal": "s_hesitation_secs",
+   "side": "sender",
+   "pr_auc_drop": 0.011,
+   "caught_drop": 0.107
+  },
+  {
+   "signal": "r_outflow_ratio_24h",
+   "side": "recipient",
+   "pr_auc_drop": 0.011,
+   "caught_drop": 0.055
+  },
+  {
+   "signal": "i_geo_mismatch",
+   "side": "pair",
+   "pr_auc_drop": 0.011,
+   "caught_drop": 0.065
+  },
+  {
+   "signal": "r_sim_age_days",
+   "side": "recipient",
+   "pr_auc_drop": 0.01,
+   "caught_drop": 0.05
+  },
+  {
+   "signal": "r_shared_device_wallets",
+   "side": "recipient",
+   "pr_auc_drop": 0.01,
+   "caught_drop": 0.06
+  },
+  {
+   "signal": "r_age_days",
+   "side": "recipient",
+   "pr_auc_drop": 0.008,
+   "caught_drop": 0.035
+  },
+  {
+   "signal": "r_report_rate",
+   "side": "recipient",
+   "pr_auc_drop": 0.008,
+   "caught_drop": 0.043
+  },
+  {
+   "signal": "i_same_amount_inflows_24h",
+   "side": "pair",
+   "pr_auc_drop": 0.008,
+   "caught_drop": 0.035
+  },
+  {
+   "signal": "r_sim_swap_recent",
+   "side": "recipient",
+   "pr_auc_drop": 0.007,
+   "caught_drop": 0.019
+  },
+  {
+   "signal": "s_amount_edits",
+   "side": "sender",
+   "pr_auc_drop": 0.005,
+   "caught_drop": 0.026
+  },
+  {
+   "signal": "r_dormant_days",
+   "side": "recipient",
+   "pr_auc_drop": 0.005,
+   "caught_drop": 0.018
+  },
+  {
+   "signal": "r_report_count",
+   "side": "recipient",
+   "pr_auc_drop": 0.005,
+   "caught_drop": 0.016
+  },
+  {
+   "signal": "s_hour_unusual",
+   "side": "sender",
+   "pr_auc_drop": 0.003,
+   "caught_drop": 0.022
+  },
+  {
+   "signal": "r_kyc_level",
+   "side": "recipient",
+   "pr_auc_drop": 0.003,
+   "caught_drop": 0.016
+  },
+  {
+   "signal": "i_mutual_contacts",
+   "side": "pair",
+   "pr_auc_drop": 0.003,
+   "caught_drop": 0.02
+  },
+  {
+   "signal": "s_history_count",
+   "side": "sender",
+   "pr_auc_drop": 0.002,
+   "caught_drop": 0.016
+  },
+  {
+   "signal": "s_new_device",
+   "side": "sender",
+   "pr_auc_drop": 0.001,
+   "caught_drop": 0.006
+  },
+  {
+   "signal": "s_log_mins_since_credit",
+   "side": "sender",
+   "pr_auc_drop": -0.0,
+   "caught_drop": 0.0
+  },
+  {
+   "signal": "r_prior_txns",
+   "side": "recipient",
+   "pr_auc_drop": 0.0,
+   "caught_drop": 0.001
+  },
+  {
+   "signal": "i_amount_vs_recipient_typical",
+   "side": "pair",
+   "pr_auc_drop": 0.0,
+   "caught_drop": 0.001
+  }
+ ],
+ "worst_single_signal_drop_in_caught_pct": 19.5,
+ "score_spread": {
+  "scams_scoring_99_or_more_pct": 10.6,
+  "scam_score_percentiles": {
+   "5": 0.9,
+   "25": 23.5,
+   "50": 69.9,
+   "75": 94.3,
+   "95": 99.6
+  },
+  "genuine_score_percentiles": {
+   "50": 0.3,
+   "95": 9.4,
+   "99": 34.8
+  },
+  "distinct_scores_in_test": 101
+ },
+ "by_story": {
+  "basic_kyc_student": {
+   "label": 0,
+   "n": 1506,
+   "caught_at_hold_tier_pct": 0.7,
+   "median_risk_pct": 0.5,
+   "push_share_pct": {
+    "sender": 34.0,
+    "recipient": 49.0,
+    "pair": 16.0
+   }
+  },
+  "big_first_payment": {
+   "label": 0,
+   "n": 1533,
+   "caught_at_hold_tier_pct": 2.2,
+   "median_risk_pct": 4.2,
+   "push_share_pct": {
+    "sender": 45.0,
+    "recipient": 28.0,
+    "pair": 27.0
+   }
+  },
+  "busy_merchant": {
+   "label": 0,
+   "n": 2305,
+   "caught_at_hold_tier_pct": 0.0,
+   "median_risk_pct": 0.0,
+   "push_share_pct": {
+    "sender": 27.0,
+    "recipient": 45.0,
+    "pair": 27.0
+   }
+  },
+  "clean_recipient": {
+   "label": 1,
+   "n": 166,
+   "caught_at_hold_tier_pct": 19.3,
+   "median_risk_pct": 26.0,
+   "push_share_pct": {
+    "sender": 53.0,
+    "recipient": 27.0,
+    "pair": 20.0
+   }
+  },
+  "faint_signals": {
+   "label": 1,
+   "n": 136,
+   "caught_at_hold_tier_pct": 0.0,
+   "median_risk_pct": 0.7,
+   "push_share_pct": {
+    "sender": 31.0,
+    "recipient": 45.0,
+    "pair": 24.0
+   }
+  },
+  "new_honest_wallet": {
+   "label": 0,
+   "n": 2986,
+   "caught_at_hold_tier_pct": 0.6,
+   "median_risk_pct": 0.6,
+   "push_share_pct": {
+    "sender": 31.0,
+    "recipient": 44.0,
+    "pair": 25.0
+   }
+  },
+  "officer_call": {
+   "label": 1,
+   "n": 515,
+   "caught_at_hold_tier_pct": 58.3,
+   "median_risk_pct": 74.2,
+   "push_share_pct": {
+    "sender": 32.0,
+    "recipient": 52.0,
+    "pair": 17.0
+   }
+  },
+  "prize_or_fee": {
+   "label": 1,
+   "n": 286,
+   "caught_at_hold_tier_pct": 58.7,
+   "median_risk_pct": 76.3,
+   "push_share_pct": {
+    "sender": 16.0,
+    "recipient": 67.0,
+    "pair": 16.0
+   }
+  },
+  "quiet_old_mule": {
+   "label": 1,
+   "n": 256,
+   "caught_at_hold_tier_pct": 57.0,
+   "median_risk_pct": 72.5,
+   "push_share_pct": {
+    "sender": 24.0,
+    "recipient": 61.0,
+    "pair": 15.0
+   }
+  },
+  "real_emergency": {
+   "label": 0,
+   "n": 1099,
+   "caught_at_hold_tier_pct": 0.5,
+   "median_risk_pct": 1.2,
+   "push_share_pct": {
+    "sender": 63.0,
+    "recipient": 31.0,
+    "pair": 6.0
+   }
+  },
+  "refund_by_mistake": {
+   "label": 1,
+   "n": 404,
+   "caught_at_hold_tier_pct": 81.7,
+   "median_risk_pct": 94.7,
+   "push_share_pct": {
+    "sender": 23.0,
+    "recipient": 40.0,
+    "pair": 38.0
+   }
+  },
+  "relative_emergency": {
+   "label": 1,
+   "n": 237,
+   "caught_at_hold_tier_pct": 46.0,
+   "median_risk_pct": 55.7,
+   "push_share_pct": {
+    "sender": 27.0,
+    "recipient": 50.0,
+    "pair": 23.0
+   }
+  },
+  "routine": {
+   "label": 0,
+   "n": 28571,
+   "caught_at_hold_tier_pct": 0.1,
+   "median_risk_pct": 0.2,
+   "push_share_pct": {
+    "sender": 37.0,
+    "recipient": 43.0,
+    "pair": 20.0
+   }
+  }
+ },
+ "calibration": [
+  {
+   "band": "0%-2%",
+   "predicted_pct": 0.4,
+   "actual_scam_pct": 0.5,
+   "n": 31410
+  },
+  {
+   "band": "2%-5%",
+   "predicted_pct": 3.1,
+   "actual_scam_pct": 2.1,
+   "n": 3467
+  },
+  {
+   "band": "5%-10%",
+   "predicted_pct": 7.1,
+   "actual_scam_pct": 6.0,
+   "n": 1649
+  },
+  {
+   "band": "10%-20%",
+   "predicted_pct": 14.1,
+   "actual_scam_pct": 12.3,
+   "n": 1109
+  },
+  {
+   "band": "20%-40%",
+   "predicted_pct": 28.4,
+   "actual_scam_pct": 30.7,
+   "n": 759
+  },
+  {
+   "band": "40%-60%",
+   "predicted_pct": 49.7,
+   "actual_scam_pct": 53.8,
+   "n": 396
+  },
+  {
+   "band": "60%-80%",
+   "predicted_pct": 70.4,
+   "actual_scam_pct": 76.6,
+   "n": 312
+  },
+  {
+   "band": "80%-100%",
+   "predicted_pct": 93.7,
+   "actual_scam_pct": 96.1,
+   "n": 898
+  }
+ ],
+ "signal_strength": [
+  {
+   "signal": "i_first_time_recipient",
+   "side": "pair",
+   "share_pct": 9.2
+  },
+  {
+   "signal": "s_amount_zscore",
+   "side": "sender",
+   "share_pct": 7.9
+  },
+  {
+   "signal": "s_round_amount",
+   "side": "sender",
+   "share_pct": 6.4
+  },
+  {
+   "signal": "s_balance_share",
+   "side": "sender",
+   "share_pct": 6.2
+  },
+  {
+   "signal": "r_inflow_count_24h",
+   "side": "recipient",
+   "share_pct": 5.7
+  },
+  {
+   "signal": "r_wallets_per_nid",
+   "side": "recipient",
+   "share_pct": 5.2
+  },
+  {
+   "signal": "s_on_call",
+   "side": "sender",
+   "share_pct": 4.8
+  },
+  {
+   "signal": "i_geo_mismatch",
+   "side": "pair",
+   "share_pct": 4.8
+  },
+  {
+   "signal": "r_median_hold_mins",
+   "side": "recipient",
+   "share_pct": 4.7
+  },
+  {
+   "signal": "r_first_time_senders_24h",
+   "side": "recipient",
+   "share_pct": 4.5
+  },
+  {
+   "signal": "s_hesitation_secs",
+   "side": "sender",
+   "share_pct": 4.2
+  },
+  {
+   "signal": "r_shared_device_wallets",
+   "side": "recipient",
+   "share_pct": 3.7
+  },
+  {
+   "signal": "r_outflow_ratio_24h",
+   "side": "recipient",
+   "share_pct": 3.6
+  },
+  {
+   "signal": "r_cashout_agents_7d",
+   "side": "recipient",
+   "share_pct": 3.3
+  },
+  {
+   "signal": "r_sim_age_days",
+   "side": "recipient",
+   "share_pct": 2.9
+  },
+  {
+   "signal": "i_same_amount_inflows_24h",
+   "side": "pair",
+   "share_pct": 2.6
+  },
+  {
+   "signal": "i_mutual_contacts",
+   "side": "pair",
+   "share_pct": 2.6
+  },
+  {
+   "signal": "r_report_rate",
+   "side": "recipient",
+   "share_pct": 2.4
+  },
+  {
+   "signal": "s_amount_edits",
+   "side": "sender",
+   "share_pct": 2.3
+  },
+  {
+   "signal": "r_age_days",
+   "side": "recipient",
+   "share_pct": 2.1
+  },
+  {
+   "signal": "s_hour_unusual",
+   "side": "sender",
+   "share_pct": 1.8
+  },
+  {
+   "signal": "s_history_count",
+   "side": "sender",
+   "share_pct": 1.6
+  },
+  {
+   "signal": "r_kyc_level",
+   "side": "recipient",
+   "share_pct": 1.4
+  },
+  {
+   "signal": "i_sms_claim_mismatch",
+   "side": "pair",
+   "share_pct": 1.4
+  },
+  {
+   "signal": "r_sim_swap_recent",
+   "side": "recipient",
+   "share_pct": 1.3
+  },
+  {
+   "signal": "r_dormant_days",
+   "side": "recipient",
+   "share_pct": 1.2
+  },
+  {
+   "signal": "r_report_count",
+   "side": "recipient",
+   "share_pct": 1.1
+  },
+  {
+   "signal": "s_new_device",
+   "side": "sender",
+   "share_pct": 0.6
+  },
+  {
+   "signal": "r_prior_txns",
+   "side": "recipient",
+   "share_pct": 0.3
+  },
+  {
+   "signal": "i_amount_vs_recipient_typical",
+   "side": "pair",
+   "share_pct": 0.2
+  },
+  {
+   "signal": "s_log_mins_since_credit",
+   "side": "sender",
+   "share_pct": 0.0
+  }
+ ],
+ "platt": {
+  "a": 1.1667790229850328,
+  "b": 0.3253857609308534
+ }
+}
