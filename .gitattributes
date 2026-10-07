@@ -1,2 +1,3 @@
 shield-api/transfer_risk/artifacts/* -text
 shield-api/liquidity/artifacts/* -text
+shield-api/graded_risk/artifacts/* -text
