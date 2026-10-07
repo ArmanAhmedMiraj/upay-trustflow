@@ -276,3 +276,21 @@ tests/             backend tests
 
 ## Licence
 MIT. See `LICENSE`.
+
+
+## Updates during the final (7 October 2026)
+
+Work done during the final, in response to the Phase 1 judge feedback. All numbers below were measured on one laptop with the synthetic demo data.
+
+**Security: signed wallet-to-Shield calls.** When `SHIELD_API_SECRET` is set on both sides, every call from the wallet to Shield carries an HMAC-SHA256 signature over a timestamp and the request body. Shield refuses unsigned, altered or replayed (older than 5 minutes) calls with a 401. With no secret set nothing changes, so the demo and the tests run as before (`shield-api/request_auth.py`, `tests/test_request_auth.py`).
+
+**Performance: load and latency test.** `python simulator/load_test_shield.py` sends valid made-up transfers to Shield and prints throughput and latency.
+- One caller at a time: median 6.2 ms per score over HTTP (p95 11.8 ms, p99 14.5 ms), about 126 scores per second.
+- 50 callers at once: about 135 scores per second, 0 failures out of 1,000. One Shield process on one laptop reaches roughly 130 scores per second; scaling beyond that means running more copies of the service, which we have not load tested.
+
+**Accessibility: automated WCAG 2.1 A/AA audit (axe-core).** We checked the login screen (0 violations), the home screen (1 colour-contrast violation, fixed, then 0) and the risk-warning screen (0 violations). This is an automated check, which finds only part of the possible problems. Screen-reader and keyboard testing are still to be done.
+
+**Honest notes.**
+- All data is synthetic. Validation on real upay data is the first step of any pilot.
+- Before the final we also prepared, on a private branch, a second experimental model and an analyst explanation view. They are not part of this repository.
+- Known limits: quiet, unreported mule wallets are the weakest case, and the scam-type guess is only about 54% accurate.
