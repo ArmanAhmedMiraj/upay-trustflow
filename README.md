@@ -208,9 +208,9 @@ question tier at this moment (it depends on the time of day).
 ## 7. Testing
 
 ```
-python -m pytest -q                    # backend, both models, Risk Lab, deployment: 325 tests
+python -m pytest -q                    # backend, both models, Risk Lab, deployment: 336 tests
 cd wallet-app
-npm test                               # phone app and console: 155 tests
+npm test                               # phone app and console: 158 tests
 ```
 What the tests prove: features never use the future (a test rebuilds features from truncated history and we checked it catches a
 deliberate leak); the live feature builder matches the training builder on a whole simulated world; no single signal can raise an
@@ -339,7 +339,7 @@ Our choice is not the highest raw score: unrestricted boosting is about 2 points
 | Problem relevance | National loss figures, competitor slide | **Open:** needs sourced numbers. |
 | Business impact | Letter of intent from upay | **Not possible from our side.** |
 | AI/ML depth | Real data, sequence model, better scam-type guess | **Not done.** Next steps; all data here is synthetic. |
-| Scalability | Offline agent mode, monitoring, production infrastructure | **Not done.** Next steps. |
+| Scalability | Offline agent mode, monitoring, production infrastructure | **Done in part.** `/ready` and Prometheus `/metrics` on wallet and Shield, offline agent forecast on the phone, a production-shaped compose file (not run here), and a written list of what is not built: [docs/production-infrastructure.md](docs/production-infrastructure.md). Not built: alerting, migrations and backups, rate limiting, log shipping, secrets manager, offline refill queue. |
 | Responsible AI | Quiet-account evasion | **Documented limit.** Quiet, unreported collector accounts remain the weakest case. |
 
 **Honest notes.**
@@ -354,3 +354,9 @@ Our choice is not the highest raw score: unrestricted boosting is about 2 points
 - **Honest limits.** The calendar covers the simulated 60 days, not a full year. Nearby-user counts are *invented estimates* per area type (not live location data), shown for context and not used as a model input. The forecasting model was not retrained for this change, and no model comparison has been run for agent cash yet. Real live-location counts, a year-long calendar and a retrained, compared model are the planned next step.
 
 **Adapters and multi-tenant (final-day addition).** A second provider can use the same Shield with its own signing secret (`X-Shield-Tenant` header, `SHIELD_TENANTS` setting) and its own field names through an adapter (`POST /risk/score-adapted`). With no tenants configured Shield behaves exactly as before. Test `tests/test_tenants.py` shows an invented second provider gets the same score as our own format, and one provider cannot sign as another. Design, limits and what is not built: [docs/adapters-and-multi-tenant.md](docs/adapters-and-multi-tenant.md).
+
+**Production infrastructure (final-day addition).** Details, proof and the honest list of gaps: [docs/production-infrastructure.md](docs/production-infrastructure.md).
+- `GET /ready` (Shield: model loaded; wallet: database answers) and `GET /metrics` (Prometheus text: requests by route and status, latency histogram, decisions by tier). Counters only, never customer data. `/health`, `/ready` and `/metrics` stay open even when calls must be signed.
+- **Offline agent mode:** the agent app keeps the last forecast it received and, with no connection, shows it labelled "No connection. Showing the forecast saved at ...". A server refusal is never replaced by an old forecast. Refill requests still need a connection.
+- `docker-compose.production.yml`: PostgreSQL plus 2 wallet and 2 Shield copies with readiness health checks. **Written but not run in this build environment, and the wallet is not tested on PostgreSQL.** The live demo remains one Docker service with SQLite.
+- Tests: `tests/test_monitoring.py` and the offline tests in `wallet-app/src/screens/Agents.test.jsx`.

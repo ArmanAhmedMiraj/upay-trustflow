@@ -20,7 +20,7 @@ import tenants
 SIGNATURE_HEADER = "x-shield-signature"
 TIMESTAMP_HEADER = "x-shield-timestamp"
 MAX_AGE_SECONDS = 300
-OPEN_PATHS = ("/health", "/docs", "/redoc", "/openapi.json")
+OPEN_PATHS = ("/health", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json")
 
 
 def sign(secret: str, timestamp: str, body: bytes) -> str:

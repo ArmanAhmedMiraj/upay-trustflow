@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api.js'
@@ -45,6 +45,7 @@ function home(props = {}) {
 }
 
 beforeEach(() => {
+  localStorage.clear()
   vi.clearAllMocks()
   api.agentForecast.mockResolvedValue(RED)
   api.agentRefillRequests.mockResolvedValue({ requests: [] })
@@ -107,6 +108,34 @@ describe('Agent phone screen', () => {
     await u.click(screen.getByRole('button', { name: t('scenarioNormal') }))
     await waitFor(() => expect(api.agentForecast).toHaveBeenLastCalledWith('normal'))
     expect(await screen.findByText(t('statusGreen'))).toBeInTheDocument()
+  })
+
+  it('offline: shows the last forecast this phone saved, labelled, instead of an error', async () => {
+    home()
+    expect(await screen.findByText(t('statusRed'))).toBeInTheDocument()       // online once: the forecast is saved on the phone
+    cleanup()
+    api.agentForecast.mockRejectedValue(new ApiError('network', 'x', 0))
+    home()
+    expect(await screen.findByText(t('statusRed'))).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(t('offlineNote')))).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('offline with nothing saved still shows the plain error', async () => {
+    api.agentForecast.mockRejectedValue(new ApiError('network', 'x', 0))
+    home()
+    expect(await screen.findByRole('alert')).toHaveTextContent(t('errNetwork'))
+    expect(screen.queryByText(new RegExp(t('offlineNote')))).not.toBeInTheDocument()
+  })
+
+  it('a server refusal is never replaced by an old forecast', async () => {
+    home()
+    await screen.findByText(t('statusRed'))
+    cleanup()
+    api.agentForecast.mockRejectedValue(new ApiError('forbidden', 'no', 403))
+    home()
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByText(new RegExp(t('offlineNote')))).not.toBeInTheDocument()
   })
 
   it('explains problems clearly', async () => {

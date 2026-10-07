@@ -37,6 +37,12 @@ app = FastAPI(title="upay-trustflow Wallet API", version="1.0",
 app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
                    allow_methods=["*"], allow_headers=["*"])
 
+try:                                    # monitoring lives in shield-api/metrics.py; the wallet works without it
+    import metrics
+    app.add_middleware(metrics.Measured, service="wallet")
+except ImportError:                     # pragma: no cover
+    metrics = None
+
 
 @app.exception_handler(svc.WalletError)
 async def wallet_error_handler(request: Request, exc: svc.WalletError):
@@ -135,6 +141,24 @@ def txn_out(t) -> dict:
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/ready")
+def ready():
+    """200 only when the database answers; a load balancer should send traffic here only then."""
+    from sqlalchemy import text
+    try:
+        with database.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        return JSONResponse({"ready": False, "reason": type(exc).__name__}, status_code=503)
+    return {"ready": True}
+
+
+@app.get("/metrics")
+def metrics_text():
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(metrics.registry("wallet").render() if metrics else "")
 
 
 @app.post("/auth/register", status_code=201)

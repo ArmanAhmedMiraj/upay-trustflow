@@ -27,10 +27,12 @@ import safety_check  # noqa: E402
 import request_auth  # noqa: E402
 import adapters  # noqa: E402
 import tenants  # noqa: E402
+import metrics  # noqa: E402
 import scorer  # noqa: E402
 from graded_risk import api as graded_api  # noqa: E402
 from graded_risk import live as graded_live  # noqa: E402
 from features import FEATURES  # noqa: E402
+from fastapi.responses import JSONResponse, PlainTextResponse  # noqa: E402
 
 
 @asynccontextmanager
@@ -51,6 +53,7 @@ app = FastAPI(title="upay Shield API", version="1.0", lifespan=lifespan,
 
 # only the wallet may ask for a score: calls must be signed when SHIELD_API_SECRET is set (see request_auth.py)
 app.add_middleware(request_auth.SignedRequests)
+app.add_middleware(metrics.Measured, service="shield")      # counts and times every request (see metrics.py)
 
 # the graded-risk model with per-signal explanations (sender, recipient and link signals); see graded_risk/
 app.include_router(graded_api.router)
@@ -154,6 +157,7 @@ def _artifacts(request: Request) -> scorer.Artifacts:
 
 def _attach_message(result: dict, tier: str, request: Request) -> None:
     """Add the customer's warning. The decision (tier, action) is already final; this only adds words."""
+    metrics.registry("shield").event("decisions", tier)
     msg = messages.generate_message(tier, result.get("scam_type"), result["reasons"], request.app.state.llm)
     result["message_bn"] = msg["bn"] if msg else None
     result["message_en"] = msg["en"] if msg else None
@@ -171,6 +175,19 @@ def health(request: Request):
         "tier_thresholds": art.tiers if art is not None else None,
         "error": request.app.state.load_error,
     }
+
+
+@app.get("/ready")
+def ready(request: Request):
+    """200 only when the model is loaded; a load balancer should send traffic here only then."""
+    if request.app.state.artifacts is None:
+        return JSONResponse({"ready": False, "reason": request.app.state.load_error or "model not loaded"}, status_code=503)
+    return {"ready": True}
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics_text():
+    return metrics.registry("shield").render()
 
 
 @app.post("/risk/score", response_model=RiskResponse)

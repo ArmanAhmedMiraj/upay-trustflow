@@ -1,0 +1,49 @@
+# Production-shaped layout (NOT the live demo, which is one service on Render). Not run in this build environment: treat as a
+# starting point and test it on your own machine with:   docker compose -f docker-compose.production.yml up --build
+#
+#   customers / agents -> wallet (2 copies) -> shield (2 copies, signed calls) ; wallet -> postgres
+# Shield keeps no data between calls, so its copies can be added or removed freely. Replace every <placeholder> first;
+# in real use take secrets from a secrets manager, not from this file.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: upay
+      POSTGRES_PASSWORD: <db-password>
+      POSTGRES_DB: wallet
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U upay -d wallet"]
+      interval: 5s
+      retries: 10
+
+  shield:
+    build: .
+    command: sh -c "cd /app/shield-api && uvicorn shield_api:app --host 0.0.0.0 --port 8001"
+    environment:
+      PYTHONPATH: /app/shield-api:/app/shield-api/transfer_risk
+      SHIELD_API_SECRET: <shield-secret>
+    deploy: { replicas: 2 }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/ready').status==200 else 1)"]
+      interval: 10s
+      retries: 5
+
+  wallet:
+    build: .
+    command: sh -c "cd /app/wallet-api && uvicorn wallet_api:app --host 0.0.0.0 --port 8000"
+    environment:
+      PYTHONPATH: /app/wallet-api:/app/shield-api:/app/simulator
+      DATABASE_URL: postgresql+psycopg://upay:<db-password>@postgres:5432/wallet
+      SHIELD_API_URL: http://shield:8001          # a load balancer or the service name spreads calls over the copies
+      SHIELD_API_SECRET: <shield-secret>
+      PIN_PEPPER: <long-random-text>
+      DEMO_MODE: "0"
+    depends_on:
+      postgres: { condition: service_healthy }
+      shield: { condition: service_healthy }
+    deploy: { replicas: 2 }
+    ports: ["8000:8000"]
+
+volumes:
+  pgdata: {}

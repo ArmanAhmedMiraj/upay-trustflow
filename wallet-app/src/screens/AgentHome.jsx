@@ -7,6 +7,9 @@ import ForecastChart from '../components/ForecastChart.jsx'
 
 const SCENARIOS = [['normal', 'scenarioNormal'], ['payday', 'scenarioPayday'], ['festival', 'scenarioFestival']]
 const SHOW_DEMO = import.meta.env?.VITE_DEMO !== '0'
+const cacheKey = (when) => `agent-forecast:${when}`
+const readCache = (when) => { try { return JSON.parse(localStorage.getItem(cacheKey(when))) } catch { return null } }
+const writeCache = (when, data) => { try { localStorage.setItem(cacheKey(when), JSON.stringify({ at: new Date().toISOString(), data })) } catch { /* private mode: no offline copy */ } }
 const STATUS_TEXT = { red: 'statusRed', yellow: 'statusYellow', green: 'statusGreen' }
 
 /** The agent's phone screen: how much cash they will need, when it runs out, and one tap to ask upay for a refill. */
@@ -19,13 +22,19 @@ export default function AgentHome({ user, t, lang, onToggleLang, onLogout }) {
   const [error, setError] = useState('')
   const [flash, setFlash] = useState('')
   const [busy, setBusy] = useState(false)
+  const [offlineAt, setOfflineAt] = useState(null)      // when the forecast on screen was saved, if we could not reach the server
 
   const loadRequests = useCallback(() => api.agentRefillRequests().then((r) => setRequests(r.requests)).catch(() => {}), [])
 
   useEffect(() => {
     setData(null)
     setError('')
-    api.agentForecast(day ?? scenario).then(setData).catch((e) => setError(errorText(e, t)))
+    setOfflineAt(null)
+    const when = day ?? scenario
+    api.agentForecast(when).then((d) => { writeCache(when, d); setData(d) }).catch((e) => {
+      const saved = e?.code === 'network' ? readCache(when) : null       // offline: show the last forecast this phone saved, clearly labelled
+      if (saved) { setData(saved.data); setOfflineAt(saved.at) } else setError(errorText(e, t))
+    })
   }, [scenario, day, t])
 
   useEffect(() => { Promise.resolve().then(() => api.agentCalendar()).then((r) => setDays(r.days)).catch(() => {}) }, [])
@@ -81,6 +90,7 @@ export default function AgentHome({ user, t, lang, onToggleLang, onLogout }) {
       )}
 
       {error && <p className="error" role="alert">{error}</p>}
+      {offlineAt && <p className="muted" role="status">{t('offlineNote')} {formatWhen(offlineAt, lang)}</p>}
       {flash && <p className="flash" role="status">{flash}</p>}
       {!data && !error && <p className="muted">{t('working')}</p>}
 
