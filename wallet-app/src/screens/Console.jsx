@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { errorText, makeT } from '../i18n.js'
 import { formatPhone, formatRemaining, formatTaka, formatWhen, parseApiTime } from '../format.js'
 import AgentsTab from './AgentsTab.jsx'
+import RiskLab from './RiskLab.jsx'
 
 export const SCAM_NAMES = {
   return_by_mistake: "Return money 'sent by mistake'",
@@ -54,6 +55,7 @@ export default function Console({ user, onLogout, onDemoReset }) {
           <button role="tab" aria-selected={tab === 'cases'} className={tab === 'cases' ? 'on' : ''} onClick={() => setTab('cases')}>Cases</button>
           <button role="tab" aria-selected={tab === 'impact'} className={tab === 'impact' ? 'on' : ''} onClick={() => setTab('impact')}>Impact</button>
           <button role="tab" aria-selected={tab === 'agents'} className={tab === 'agents' ? 'on' : ''} onClick={() => setTab('agents')}>Agents</button>
+          <button role="tab" aria-selected={tab === 'lab'} className={tab === 'lab' ? 'on' : ''} onClick={() => setTab('lab')}>Risk Lab</button>
         </nav>
         <div className="console-actions">
           <button className="lang dark" onClick={reset} disabled={resetting}>
@@ -63,7 +65,7 @@ export default function Console({ user, onLogout, onDemoReset }) {
         </div>
       </header>
       {error && <p className="error" role="alert">{error}</p>}
-      {tab === 'cases' ? <Cases /> : tab === 'impact' ? <Impact /> : <AgentsTab />}
+      {tab === 'cases' ? <Cases /> : tab === 'impact' ? <Impact /> : tab === 'lab' ? <RiskLab /> : <AgentsTab />}
     </div>
   )
 }
