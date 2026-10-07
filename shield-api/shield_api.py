@@ -26,6 +26,7 @@ import messages  # noqa: E402
 import safety_check  # noqa: E402
 import request_auth  # noqa: E402
 import scorer  # noqa: E402
+from graded_risk import api as graded_api  # noqa: E402
 from features import FEATURES  # noqa: E402
 
 
@@ -47,6 +48,9 @@ app = FastAPI(title="upay Shield API", version="1.0", lifespan=lifespan,
 
 # only the wallet may ask for a score: calls must be signed when SHIELD_API_SECRET is set (see request_auth.py)
 app.add_middleware(request_auth.SignedRequests)
+
+# the graded-risk model with per-signal explanations (sender, recipient and link signals); see graded_risk/
+app.include_router(graded_api.router)
 
 
 class TransferFeatures(BaseModel):
