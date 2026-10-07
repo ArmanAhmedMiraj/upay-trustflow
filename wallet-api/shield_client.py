@@ -19,6 +19,17 @@ import httpx
 log = logging.getLogger("wallet.shield")
 
 
+def _signed_headers(body: bytes) -> dict:
+    """Content type, plus the signature Shield checks when SHIELD_API_SECRET is set."""
+    headers = {"Content-Type": "application/json"}
+    secret = os.getenv("SHIELD_API_SECRET", "").strip()
+    if secret:   # prove to Shield that this call comes from the wallet and was not changed on the way
+        stamp = str(int(time.time()))
+        headers["X-Shield-Timestamp"] = stamp
+        headers["X-Shield-Signature"] = hmac.new(secret.encode(), stamp.encode() + b"." + body, hashlib.sha256).hexdigest()
+    return headers
+
+
 def _post(path: str, payload: dict) -> dict | None:
     """One HTTP call to Shield. Tests replace this function."""
     url = os.getenv("SHIELD_API_URL", "").strip().rstrip("/")
@@ -26,13 +37,22 @@ def _post(path: str, payload: dict) -> dict | None:
         return None
     timeout = float(os.getenv("SHIELD_TIMEOUT_SECONDS", "2.0"))
     body = json.dumps(payload, separators=(",", ":")).encode()
-    headers = {"Content-Type": "application/json"}
-    secret = os.getenv("SHIELD_API_SECRET", "").strip()
-    if secret:   # prove to Shield that this call comes from the wallet and was not changed on the way
-        stamp = str(int(time.time()))
-        headers["X-Shield-Timestamp"] = stamp
-        headers["X-Shield-Signature"] = hmac.new(secret.encode(), stamp.encode() + b"." + body, hashlib.sha256).hexdigest()
-    response = httpx.post(url + path, content=body, headers=headers, timeout=timeout)
+    response = httpx.post(url + path, content=body, headers=_signed_headers(body), timeout=timeout)
+    response.raise_for_status()
+    return response.json()
+
+
+def lab_call(method: str, path: str, payload: dict | None = None) -> dict:
+    """A call from the analyst's Risk Lab to Shield. Unlike a payment check this has no safe fallback, so it raises.
+
+    The lab is not on the payment path: if Shield is down the analyst sees a plain message and no money is affected.
+    Tests replace this function.
+    """
+    url = os.getenv("SHIELD_API_URL", "").strip().rstrip("/")
+    if not url:
+        raise RuntimeError("Shield is not switched on (SHIELD_API_URL is not set)")
+    body = json.dumps(payload, separators=(",", ":")).encode() if payload is not None else b""
+    response = httpx.request(method, url + path, content=body or None, headers=_signed_headers(body), timeout=10.0)
     response.raise_for_status()
     return response.json()
 

@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import impact as impact_metrics
+import shield_client
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "shield-api" / "liquidity"))   # Module 2 (agent cash forecasting)
 import wallet_service as svc
 import database
@@ -205,6 +206,42 @@ def analyst_impact(hours: int = 168, user: User = Depends(analyst_user), db: Ses
 def analyst_model_report(user: User = Depends(analyst_user)):
     """Offline test results (synthetic data where the truth is known)."""
     return {"report": impact_metrics.model_report()}
+
+
+# ------------------------------------------------------------------ Risk Lab (analysts): how the model reached a score
+class LabIn(BaseModel):
+    sender_id: str
+    recipient_id: str
+    tx: dict = Field(default_factory=dict)
+    mute_sides: list[str] = Field(default_factory=list)
+    mute_signals: list[str] = Field(default_factory=list)
+
+
+def _lab(method: str, path: str, payload: dict | None = None) -> dict:
+    try:
+        return shield_client.lab_call(method, path, payload)
+    except Exception as exc:   # Shield off, down or slow: say so plainly; no money is involved here
+        raise svc.WalletError("shield_unavailable", f"The Risk Lab needs Shield, which is not reachable ({type(exc).__name__})", 503)
+
+
+@app.get("/lab/accounts")
+def lab_accounts(user: User = Depends(analyst_user)):
+    return _lab("GET", "/risk/graded/accounts")
+
+
+@app.get("/lab/catalogue")
+def lab_catalogue(user: User = Depends(analyst_user)):
+    return _lab("GET", "/risk/graded/catalogue")
+
+
+@app.get("/lab/report")
+def lab_report(user: User = Depends(analyst_user)):
+    return _lab("GET", "/risk/graded/report")
+
+
+@app.post("/lab/score")
+def lab_score(body: LabIn, user: User = Depends(analyst_user)):
+    return _lab("POST", "/risk/graded", body.model_dump())
 
 
 # ------------------------------------------------------------------ Module 2: agent cash forecasting
