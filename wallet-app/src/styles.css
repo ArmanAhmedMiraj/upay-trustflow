@@ -293,3 +293,10 @@ table.plain th, table.plain td { text-align: left; padding: 8px 6px; border-bott
 .agent-home .scenario-switch { margin: 8px 0 12px; box-shadow: none; background: #e8eefc; }
 .agent-home .scenario-switch button { flex: 1; padding: 8px 4px; font-size: 12px; }
 .agent-home .forecast { background: #fff; border-radius: 14px; padding: 8px 10px; margin-top: 12px; }
+
+/* ---- keyboard focus ring (WCAG 2.4.7) ---- */
+:focus-visible {
+  outline: 3px solid #1c4fd8 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #ffffff !important;   /* white inner ring keeps it visible on the blue balance card */
+}
